@@ -805,13 +805,13 @@ const CONFIG = {
     names: ['あなた', 'Yoshi', 'Hinata', 'Takayuki'], // 人型頭上ラベル
     nameYOffset: 0.2, // 頭頂から上へのラベルYオフセット
     pulseColorPalette: [ // 発光色パレット(高彩度だが夜景と馴染むトーン)
-      [0.8, 0.43, 0.36], // amber
+      [0.8, 0.6, 0.2], // amber
       [0.7, 0.22, 0.30], // coral
-      [0.56, 0.80, 0.8], // sky blue
-      [0.64, 0.73, 0.36], // lime mint
-      [0.60, 0.38, 0.3], // violet pink
+      [0.06, 0.8, 0.8], // sky blue
+      [0.3, 0.9, 0.2], // lime mint
+      [0.70, 0.38, 0.0], // violet pink
     ],
-    pulsePeakIntensity: 0.3, // 0.5sec時の最大発光強度
+    pulsePeakIntensity: 0.5, // 0.5sec時の最大発光強度
     pulseDurationSec: 1.4, // 発光時間(0->peak->0)
     pulseIntervalMinSec: 6.0, // ランダム再生最小間隔
     pulseIntervalMaxSec: 11.0, // ランダム再生最大間隔
@@ -835,7 +835,7 @@ const CONFIG = {
     eyeSize:            0.15, // 頭半径に対する目サイズ比
     eyeColor:          [0.40, 0.4, 0.00], // 目の色RGB(0-1)
     headIdleMotionEnabled: true, // 頭の待機モーションON/OFF
-    headIdleSpeed: 0.72, // 頭待機モーション速度
+    headIdleSpeed: 1.2, // 頭待機モーション速度
     headIdleAmpYawDeg: 8.4, // 頭左右かしげ振り幅(度)
     headIdleAmpPitchDeg: 6.6, // 頭上下振り幅(度)
     headIdlePhaseSpread: 3.4, // 個体ごとの位相ずらし量
