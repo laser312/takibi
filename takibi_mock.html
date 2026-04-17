@@ -1,0 +1,2850 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Takibi</title>
+<link href="https://fonts.googleapis.com/css2?family=Sofia&family=Noto+Sans+JP:wght@200;300;500&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep: #0a0d18;
+    --bg-mid:  #14110d;
+    --amber:   #ffb060;
+    --amber-soft: #c8772e;
+    --menu-glass: rgba(8, 12, 24, 0.58);
+    --menu-line-warm: rgba(255,170,95,0.20);
+    --menu-line-cool: rgba(92,124,210,0.24);
+    --menu-text: #eadfce;
+    --menu-btn-warm: rgba(255,156,72,0.20);
+    --menu-btn-warm-hover: rgba(255,170,92,0.34);
+    --menu-btn-cool: rgba(34,62,128,0.30);
+    --menu-btn-cool-hover: rgba(56,94,188,0.46);
+    --friend-add-gap-to-self-id: 16px; /* 追加ボタンと自分IDの間隔 */
+    --friend-back-width: 128px;        /* 戻るボタン横幅 */
+    --friend-back-height: 48px;        /* 戻るボタン高さ */
+    --friend-back-bottom: 20px;        /* 画面下から戻るボタンまで */
+    --friend-back-text-nudge-x: 0px;   /* 戻る文字X微調整(右:+ 左:-) */
+    --friend-back-text-nudge-y: 0px;   /* 戻る文字Y微調整(下:+ 上:-) */
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    width:100%;height:100%;
+    background:radial-gradient(ellipse at 50% 65%, #1a1410 0%, var(--bg-deep) 55%, #05070d 100%);
+    overflow:hidden;
+    font-family:'Noto Sans JP',sans-serif;
+    color:var(--amber);
+    -webkit-font-smoothing:antialiased;
+  }
+  #stage{
+    position:fixed;inset:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #frame{
+    position:relative;
+    width:100vw;height:100vh;
+    max-width:430px;max-height:100vh;
+    overflow:hidden;
+  }
+  @media(min-width:500px){
+    #frame{
+      max-height:900px;
+      border-radius:38px;
+      box-shadow:0 0 80px rgba(255,140,60,0.06),0 0 0 1px rgba(255,180,100,0.05);
+    }
+  }
+  canvas{display:block;width:100% !important;height:100% !important;}
+  .title-wrap{
+    position:absolute;left:5%;right:0;top:18%;
+    text-align:center;pointer-events:none;
+    opacity:0;transform:translateY(8px);
+    animation:fadeUp 3.6s ease 0.5s forwards;
+    transition:opacity 0.6s ease;
+  }
+  .title-wrap.hide{
+    opacity:0 !important;
+    transform:translateY(10px);
+    transition:opacity 0.7s ease, transform 0.7s ease;
+  }
+  .title{
+    font-family:'Sofia',cursive;
+    font-size:46px;font-weight:400;letter-spacing:0.5em;
+    color:#ffd9a8;
+    text-shadow:0 0 18px rgba(255,150,60,0.35),0 0 42px rgba(255,120,40,0.18);
+  }
+  .tap-enter{
+    position:absolute;left:0;right:0;bottom:5%;
+    text-align:center;font-family:'Sofia',cursive;
+    font-size:20px;letter-spacing:0.32em;
+    color:rgba(255,190,130,0.6);pointer-events:none;
+    opacity:0;
+    animation:fadeIn 3s ease 1.5s forwards, slowPulse 5.2s ease-in-out 6s infinite;
+    transition:opacity 0.4s ease;
+  }
+  .tap-enter.hide{
+    opacity:0 !important;
+    transition:opacity 0.7s ease;
+  }
+  @keyframes fadeUp   {to{opacity:1;transform:translateY(0);}}
+  @keyframes fadeIn   {to{opacity:1;}}
+  @keyframes slowPulse{0%,100%{opacity:0.18;}50%{opacity:0.75;}}
+  /* ワールド背景の明るいレイヤー: body背景の前面に重ね、opacity遷移で切り替える */
+  #worldBg{
+    position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 65%, #2a1e10 0%, #14161f 55%, #0a0c14 100%);
+    opacity:0;
+    transition:opacity 2.6s ease;
+  }
+  #vignette{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 60%,
+      rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 90%,rgba(0,0,0,0.85) 100%);
+    mix-blend-mode:multiply;
+  }
+  #menuBtn{
+    position:absolute;top:16px;left:14px;z-index:40;
+    width:42px;height:42px;border-radius:10px;
+    border:none;
+    background:transparent;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.35s ease;
+  }
+  #menuBtn.menu-ready{
+    pointer-events:auto;
+  }
+  #menuBtn::before{
+    content:"";
+    position:absolute;inset:0;
+    border-radius:10px;
+    border:2px solid rgba(255,180,110,0.30);
+    background:rgba(13,22,58,0.78);
+    backdrop-filter:blur(4px);
+    opacity:0;
+    transition:opacity 0.25s ease;
+    pointer-events:none;
+  }
+  #menuBtn .line{
+    position:absolute;width:20px;height:2px;border-radius:2px;
+    background:rgba(239, 223, 200, 0.92);
+    transition:transform 0.52s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.52s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  #menuBtn .line:nth-child(1){transform:translateY(-6px);}
+  #menuBtn .line:nth-child(2){transform:translateY(0);}
+  #menuBtn .line:nth-child(3){transform:translateY(6px);}
+  #menuBtn.open .line:nth-child(1){transform:rotate(45deg);}
+  #menuBtn.open .line:nth-child(2){opacity:0;}
+  #menuBtn.open .line:nth-child(3){transform:rotate(-45deg);}
+  #menuBtn.open::before{opacity:1;}
+  #menuBackdrop{
+    position:absolute;inset:0;z-index:35;display:none;
+    background:rgba(3,5,10,0.26);
+  }
+  #menuBackdrop.open{display:block;}
+  #nameLayer{
+    position:absolute;inset:0;z-index:22;
+    pointer-events:none;
+  }
+  .name-tag{
+    position:absolute;
+    transform:translate(-50%, -50%);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    color:var(--menu-text);
+    text-shadow:0 2px 10px rgba(0,0,0,0.48);
+    white-space:nowrap;
+    opacity:0;
+  }
+  #sideMenu{
+    position:absolute;left:0;top:0;bottom:0;z-index:36;
+    width:86%;
+    min-width:260px;
+    max-width:388px;
+    padding:82px 16px 16px;
+    background:
+      linear-gradient(155deg, rgba(14,23,56,0.24) 0%, rgba(255,147,68,0.06) 100%),
+      var(--menu-glass);
+    border-right:2px solid var(--menu-line-warm);
+    box-shadow:0 12px 36px rgba(0,0,0,0.45);
+    backdrop-filter:blur(10px);
+    transform:translateX(-105%);
+    transition:transform 0.62s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  #sideMenu.open{transform:translateX(0);}
+  .menu-item{
+    width:100%;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid rgba(255,255,255,0.08);border-radius:10px;
+    background:rgba(8,12,24,0.36);
+    color:var(--menu-text);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:18px;font-weight:700;
+    padding:12px 12px;
+    margin-bottom:10px;
+    text-align:center;
+    cursor:pointer;
+    letter-spacing:0.02em;
+    transition:background-color 0.32s ease, color 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease;
+  }
+  .menu-item.register{
+    background:var(--menu-btn-cool);
+    border-color:rgba(255,180,110,0.30);
+  }
+  .menu-item.remove{
+    background:var(--menu-btn-cool);
+    border-color:rgba(255,180,110,0.30);
+  }
+  .menu-item.register:hover{
+    background:var(--menu-btn-cool-hover);
+    color:#e9f0ff;
+    border-color:rgba(255,194,138,0.52);
+    box-shadow:0 0 0 1px rgba(255,170,95,0.22) inset;
+  }
+  .menu-item.remove:hover{
+    background:var(--menu-btn-cool-hover);
+    color:#e9f0ff;
+    border-color:rgba(255,194,138,0.52);
+    box-shadow:0 0 0 1px rgba(255,170,95,0.22) inset;
+  }
+  .menu-item.list{
+    background:var(--menu-btn-cool);
+    border-color:rgba(255,180,110,0.30);
+  }
+  .menu-item.list:hover{
+    background:var(--menu-btn-cool-hover);
+    color:#e9f0ff;
+    border-color:rgba(255,194,138,0.52);
+    box-shadow:0 0 0 1px rgba(255,170,95,0.22) inset;
+  }
+  #friendUiLayer{
+    position:absolute;inset:0;z-index:38;
+    pointer-events:none;
+  }
+  #friendUiLayer.open{
+    pointer-events:auto;
+  }
+  .friend-panel{
+    position:absolute;left:0;top:0;bottom:0;
+    width:86%;
+    min-width:260px;
+    max-width:388px;
+    padding:82px 16px 16px;
+    background:
+      linear-gradient(150deg, rgba(12,22,56,0.34) 0%, rgba(255,145,70,0.08) 100%),
+      rgba(7,11,24,0.78);
+    border-right:2px solid rgba(255,176,108,0.30);
+    box-shadow:0 14px 42px rgba(0,0,0,0.55);
+    backdrop-filter:blur(10px);
+    transform:translateX(-108%);
+    opacity:0;
+    transition:transform 0.62s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.48s ease;
+    pointer-events:none;
+    text-align:center;
+  }
+  .friend-panel.open{
+    transform:translateX(0);
+    opacity:1;
+    pointer-events:auto;
+  }
+  .friend-panel-head{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .friend-panel-title{
+    color:var(--menu-text);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:0.02em;
+  }
+  .friend-back-btn{
+    border:2px solid rgba(255,185,126,0.34);
+    border-radius:12px;
+    background:linear-gradient(165deg, rgba(31,58,122,0.62) 0%, rgba(78,46,29,0.54) 100%);
+    color:var(--menu-text);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    width:var(--friend-back-width);
+    height:var(--friend-back-height);
+    padding:0;
+    cursor:pointer;
+    display:grid;
+    place-items:center;
+    text-align:center;
+    line-height:1;
+    appearance:none;
+    -webkit-appearance:none;
+    writing-mode:horizontal-tb;
+    text-indent:0;
+    transition:filter 0.3s ease, transform 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
+    margin-top:14px;
+  }
+  .friend-back-btn .label{
+    display:block;
+    transform:translate(var(--friend-back-text-nudge-x), var(--friend-back-text-nudge-y));
+  }
+  .friend-back-btn:hover{
+    filter:brightness(1.08);
+    border-color:rgba(255,203,146,0.52);
+  }
+  .friend-back-btn:active{
+    transform:translateY(1px);
+  }
+  .friend-caption{
+    color:rgba(233,223,205,0.92);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:15px;
+    margin-bottom:10px;
+    text-align:center;
+  }
+  .friend-id-row{
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:12px;
+  }
+  .friend-id-input-wrap{
+    position:relative;
+    width:100%;
+  }
+  #friendIdInput{
+    width:100%;
+    border:1px solid rgba(255,188,128,0.28);
+    border-radius:12px;
+    background:rgba(8,12,22,0.56);
+    color:#f2e5d3;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:18px;
+    letter-spacing:0.08em;
+    padding:12px 12px;
+    outline:none;
+    transition:border-color 0.25s ease, box-shadow 0.25s ease;
+    text-align:center;
+  }
+  #friendIdInput::placeholder{
+    text-align:center;
+  }
+  #friendIdInput:focus{
+    border-color:rgba(255,190,132,0.58);
+    box-shadow:0 0 0 1px rgba(255,160,90,0.28) inset;
+  }
+  #friendFoundName{
+    display:block;
+    min-height:24px;
+    color:#eadfce;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:17px;
+    font-weight:700;
+    text-align:center;
+    opacity:0;
+    margin-top:8px;
+    margin-bottom: 12px;
+    transform:translateY(4px);
+    transition:opacity 0.46s ease, transform 0.46s ease;
+    pointer-events:none;
+  }
+  #friendFoundName.show{
+    opacity:1;
+    transform:translateY(0);
+  }
+  .friend-action-btn{
+    width:100%;
+    border:2px solid rgba(255,185,126,0.34);
+    border-radius:12px;
+    background:linear-gradient(165deg, rgba(31,58,122,0.62) 0%, rgba(78,46,29,0.54) 100%);
+    color:var(--menu-text);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:19px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    padding:12px 12px;
+    cursor:pointer;
+    transition:filter 0.3s ease, transform 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
+    margin-bottom:var(--friend-add-gap-to-self-id);
+  }
+  .friend-action-btn:hover{
+    filter:brightness(1.08);
+    border-color:rgba(255,203,146,0.52);
+  }
+  .friend-action-btn:active{
+    transform:translateY(1px);
+  }
+  .friend-action-btn:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+    filter:saturate(0.65);
+  }
+  .friend-self-id{
+    color:rgba(227,215,197,0.80);
+    font-family:'Noto Sans JP',sans-serif;
+    font-size:14px;
+    letter-spacing:0.03em;
+    text-align:center;
+  }
+  .friend-list-wrap{
+    border:1px solid rgba(255,190,132,0.26);
+    border-radius:12px;
+    background:rgba(5,10,22,0.44);
+    padding:10px;
+  }
+  .friend-remove-list{
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .friend-remove-item{
+    width:100%;
+    text-align:left;
+    color:#f0e4d1;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:15px;
+    font-weight:500;
+    padding:10px 12px;
+    border-radius:9px;
+    border:1px solid rgba(255,188,128,0.18);
+    background:linear-gradient(160deg, rgba(41,66,128,0.28) 0%, rgba(94,55,35,0.24) 100%);
+    cursor:pointer;
+    transition:filter 0.25s ease, border-color 0.25s ease;
+  }
+  .friend-remove-item:hover{
+    filter:brightness(1.06);
+    border-color:rgba(255,204,151,0.52);
+  }
+  .friend-list-head{
+    color:rgba(233,223,205,0.9);
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    margin-top: 16px;
+    margin-bottom:8px;
+    text-align:center;
+  }
+  #friendWaitingList{
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .friend-wait-item{
+    color:#f0e4d1;
+    font-family:'Noto Sans JP',sans-serif;
+    font-size:15px;
+    font-weight:500;
+    padding:8px 10px;
+    border-radius:9px;
+    border:1px solid rgba(255,188,128,0.18);
+    background:linear-gradient(160deg, rgba(41,66,128,0.28) 0%, rgba(94,55,35,0.24) 100%);
+  }
+  .friend-list-empty{
+    color:rgba(227,216,200,0.62);
+    font-family:'Noto Sans JP',sans-serif;
+    font-size:13px;
+    margin-top:8px;
+    text-align:center;
+  }
+  #friendConfirm{
+    position:absolute;inset:0;z-index:39;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(3,6,14,0.38);
+    opacity:0;pointer-events:none;
+    transition:opacity 0.34s ease;
+  }
+  #friendConfirm.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+  .friend-confirm-card{
+    width:min(86%, 320px);
+    border:1px solid rgba(255,186,126,0.36);
+    border-radius:14px;
+    padding:18px 14px 14px;
+    background:
+      linear-gradient(150deg, rgba(22,40,95,0.68) 0%, rgba(87,50,29,0.58) 100%),
+      rgba(8,12,24,0.92);
+    box-shadow:0 12px 30px rgba(0,0,0,0.52);
+    backdrop-filter:blur(8px);
+    display:flex;
+    flex-direction:column;
+  }
+  #friendConfirmText{
+    color:#f2e5d2;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:20px;
+    font-weight:700;
+    text-align:center;
+    margin-bottom:14px;
+    min-height:36px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:1;
+    transform:translateY(0);
+    transition:opacity 0.28s ease, transform 0.28s ease;
+  }
+  #friendConfirmText.is-fading-out{
+    opacity:0;
+    transform:translateY(-3px);
+  }
+  #friendConfirmText.is-fading-in{
+    animation:friendConfirmTextFadeIn 0.32s ease;
+  }
+  .friend-confirm-actions{
+    display:flex;gap:10px;
+  }
+  .friend-confirm-btn{
+    flex:1;
+    border:1px solid rgba(255,191,134,0.38);
+    border-radius:10px;
+    background:rgba(16,28,66,0.56);
+    color:#f0e4d2;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:16px;
+    font-weight:700;
+    min-height:44px;
+    padding:0;
+    cursor:pointer;
+    display:grid;
+    place-items:center;
+    text-align:center;
+    line-height:1;
+    appearance:none;
+    -webkit-appearance:none;
+    text-indent:0;
+    writing-mode:horizontal-tb;
+    transition:background-color 0.28s ease, border-color 0.28s ease;
+  }
+  .friend-confirm-btn:hover{
+    background:rgba(48,77,156,0.62);
+    border-color:rgba(255,210,154,0.54);
+  }
+  .friend-confirm-card.message-mode{
+    min-height:120px;
+    justify-content:center;
+  }
+  .friend-confirm-card.message-mode #friendConfirmText{
+    margin-bottom:0;
+  }
+  @keyframes friendConfirmTextFadeIn{
+    0%{
+      opacity:0;
+      transform:translateY(3px);
+    }
+    100%{
+      opacity:1;
+      transform:translateY(0);
+    }
+  }
+  #friendToast{
+    position:absolute;
+    left:50%;
+    bottom:18%;
+    transform:translate(-50%, 10px);
+    z-index:39;
+    border:1px solid rgba(255,189,130,0.34);
+    border-radius:12px;
+    background:linear-gradient(165deg, rgba(20,37,86,0.86) 0%, rgba(90,53,31,0.78) 100%);
+    color:#f2e7d6;
+    font-family:'Shippori Mincho','Noto Sans JP',sans-serif;
+    font-size:17px;
+    font-weight:700;
+    padding:12px 16px;
+    box-shadow:0 10px 26px rgba(0,0,0,0.44);
+    opacity:0;
+    pointer-events:none;
+    text-align:center;
+  }
+  #friendToast.show{
+    animation:friendToastInOut 1.9s ease forwards;
+  }
+  #friendAddBackBtn{
+    position:absolute;
+    left:50%;
+    bottom:var(--friend-back-bottom);
+    transform:translateX(-50%);
+  }
+  #friendListBackBtn{
+    position:absolute;
+    left:50%;
+    bottom:var(--friend-back-bottom);
+    transform:translateX(-50%);
+  }
+  #friendRemoveBackBtn{
+    position:absolute;
+    left:50%;
+    bottom:var(--friend-back-bottom);
+    transform:translateX(-50%);
+  }
+  #friendAddBackBtn:active{
+    transform:translateX(-50%) translateY(1px);
+  }
+  #friendListBackBtn:active{
+    transform:translateX(-50%) translateY(1px);
+  }
+  #friendRemoveBackBtn:active{
+    transform:translateX(-50%) translateY(1px);
+  }
+  @keyframes friendToastInOut{
+    0%{opacity:0;transform:translate(-50%, 10px);}
+    18%{opacity:1;transform:translate(-50%, 0);}
+    72%{opacity:1;transform:translate(-50%, 0);}
+    100%{opacity:0;transform:translate(-50%, -6px);}
+  }
+</style>
+</head>
+<body>
+<div id="worldBg"></div>
+<div id="stage">
+  <div id="frame">
+    <button id="menuBtn" aria-label="メニューを開く" type="button">
+      <span class="line"></span>
+      <span class="line"></span>
+      <span class="line"></span>
+    </button>
+    <div id="menuBackdrop"></div>
+    <div id="nameLayer"></div>
+    <aside id="sideMenu" aria-hidden="true">
+      <button class="menu-item register" type="button">
+        <span>友達を登録する</span>
+      </button>
+      <button class="menu-item remove" type="button">
+        <span>友達を解除する</span>
+      </button>
+      <button class="menu-item list" type="button">
+        <span>友達リスト</span>
+      </button>
+    </aside>
+    <div id="friendUiLayer" aria-hidden="true">
+      <section id="friendAddPanel" class="friend-panel" aria-hidden="true">
+        <div class="friend-panel-head">
+          <h3 class="friend-panel-title">友達を登録する</h3>
+        </div>
+        <div class="friend-id-row">
+          <div class="friend-id-input-wrap">
+            <input id="friendIdInput" type="text" inputmode="numeric" maxlength="6" placeholder="友達のIDを入力する" />
+          </div>
+        </div>
+        <span id="friendFoundName">Aki</span>
+        <button id="friendAddActionBtn" class="friend-action-btn" type="button" disabled>友達を追加する</button>
+        <p class="friend-self-id">自分のID: 736482</p>
+        <button id="friendAddBackBtn" class="friend-back-btn" type="button"><span class="label">戻る</span></button>
+      </section>
+      <section id="friendListPanel" class="friend-panel" aria-hidden="true">
+        <div class="friend-panel-head">
+          <h3 class="friend-panel-title">友達リスト</h3>
+        </div>
+        <div class="friend-list-wrap">
+          <p class="friend-list-head">既存の友達</p>
+          <ul id="friendCurrentList" class="friend-remove-list"></ul>
+          <p id="friendCurrentEmpty" class="friend-list-empty">現在、友達はいません</p>
+          <p class="friend-list-head">申請中の友達</p>
+          <ul id="friendWaitingList"></ul>
+          <p id="friendListEmpty" class="friend-list-empty">現在、承認待ちはありません</p>
+        </div>
+        <button id="friendListBackBtn" class="friend-back-btn" type="button"><span class="label">戻る</span></button>
+      </section>
+      <section id="friendRemovePanel" class="friend-panel" aria-hidden="true">
+        <div class="friend-panel-head">
+          <h3 class="friend-panel-title">友達を解除する</h3>
+        </div>
+        <div class="friend-list-wrap">
+          <p class="friend-list-head">現在の友達</p>
+          <ul id="friendRemoveList" class="friend-remove-list"></ul>
+          <p id="friendRemoveEmpty" class="friend-list-empty">現在、友達はいません</p>
+        </div>
+        <button id="friendRemoveBackBtn" class="friend-back-btn" type="button"><span class="label">戻る</span></button>
+      </section>
+      <div id="friendConfirm" aria-hidden="true">
+        <div class="friend-confirm-card">
+          <p id="friendConfirmText">Akiを追加しますか？</p>
+          <div class="friend-confirm-actions">
+            <button id="friendConfirmNoBtn" class="friend-confirm-btn" type="button">no</button>
+            <button id="friendConfirmYesBtn" class="friend-confirm-btn" type="button">yes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <canvas id="fire"></canvas>
+    <div id="vignette"></div>
+    <div class="title-wrap" id="titleWrap"><div class="title">Takibi</div></div>
+    <div class="tap-enter"  id="tapEnter">- tap to enter -</div>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const CONFIG = {
+
+  /* --- 炎パーティクル (引き継ぎ) --- */
+  particleSwayX:      0.2,
+  particleSwayZ:      0.2,
+  particleTapScaleMultiplier: 0.8, // タップ後に適用するparticleサイズ倍率
+  particleYStart:    3.0,  // パーティクル生成円の下端Y
+  particleYEnd:       4.0,  // パーティクル到達円の上端Y
+  particleCount:      100,
+  particleColorBottom:   [1.00, 0.18, 0.04], // 色温度: 炎の根元側RGB (0-1)
+  particleColorMiddle:   [1.00, 0.32, 0.10], // 色温度: 中間RGB (0-1)
+  particleColorTop:      [1.00, 0.88, 0.42], // 色温度: 先端側RGB (0-1)
+
+  /* --- 薪 (引き継ぎ) --- */
+  logTaper:           0.85, // 円柱の先細り率 (小さいほど先端が細い)
+  logRadialSegments:  10,    // 薪の断面ポリゴン数 (低いほど抽象的)
+  logSilhouetteMix:   0.08, // 0=立体質感, 1=シルエット寄り
+  logColorLight:      [0.36, 0.17, 0.07], // 薪の明部RGB(0-1)
+  logColorDark:       [0.20, 0.09, 0.04], // 薪の暗部RGB(0-1)
+  logEdgeGlow:        0.20, // 輪郭の暖色発光強度
+  fireScaleMultiplier: 0.7, // 薪+炎の立体サイズ共通倍率（現状基準=1.0）---------------------------------------
+  logs: [
+    {rotX:  0.00,rotY:  0.00,       rotZ:Math.PI/2,   x: 0.00,y:-0.90,z: 0.30,len:1.70,rad:0.110,dark:false},
+    {rotX:  0.08,rotY:  Math.PI/3,  rotZ:Math.PI/2,   x:-0.06,y:-0.86,z: 0.10,len:1.60,rad:0.100,dark:true },
+    {rotX: -0.10,rotY: -Math.PI/4,  rotZ:Math.PI/2.1, x: 0.05,y:-0.82,z:-0.08,len:1.55,rad:0.095,dark:false},
+    {rotX:  0.40,rotY:  0.20,rotZ:  0.90, x: 0.14,y:-0.50,z: 0.08,len:1.45,rad:0.085,dark:true },
+    {rotX: -0.40,rotY: -0.30,rotZ: -0.90, x:-0.14,y:-0.50,z:-0.08,len:1.45,rad:0.085,dark:false},
+    {rotX:  0.80,rotY:  0.50,rotZ:  0.40, x: 0.10,y:-0.40,z:-0.16,len:1.40,rad:0.080,dark:true },
+    {rotX: -0.80,rotY: -0.40,rotZ: -0.40, x:-0.10,y:-0.40,z: 0.16,len:1.40,rad:0.080,dark:false},
+  ],
+
+  /* --- 焚き火ルック調整 --- */
+  fireStyle: {
+    flameIntensity:      1.0, // 炎の最終アルファ強度
+    flameCoreBoost:      2.05, // 炎中心の白熱感
+    flameSoftness:       1, // 炎輪郭の柔らかさ
+    flameVolumeY:        0.8, // 3D炎のYオフセット
+    flameVolumeDensity:  0.52, // 擬似ボリューム密度
+    flameVolumeOpacity:  1, // 擬似ボリュームの不透明度
+    flameAlpha:          1.00, // VolumetricFire炎の最終アルファ倍率
+    flameAlphaResponse:  1.40, // 透過率の効き方(>1で不透明寄り、<1で透過寄り)
+    flameBrightness:     1.55, // 炎全体の明度倍率
+    flameAnimationSpeed: 0.1, // VolumetricFire炎の時間変化速度
+    flame3DBaseRadius:   1.0, // 3D炎の下部半径
+    flame3DHeight:       4.0, // 3D炎の高さ
+    flame3DNoiseScale:   1.0, // 3D炎ノイズ周波数
+    flame3DNoiseSpeed:   1.0, // 3D炎ノイズ速度
+    flame3DTurbulence:   0.3, // 3D炎輪郭の乱流量
+    flameSliceSpacing:   0.08, // VolumetricFire: スライス間隔(小さいほど層感が減る)
+    flameSliceDrift:     0.35, // VolumetricFire: スライス位相ドリフト速度
+    flameVolumeDepth:    1.5, // VolumetricFire: 奥行き
+    flameTexturePath: './VolumetricFire/textures/', // VolumetricFireテクスチャパス
+    emberBedIntensity:   1.58, // 火床(炭火)の発光強度
+    emberBedPulse:       0.22, // 火床の明滅幅
+    sparkOpacity:        0.68, // 火の粉の不透明度
+    sparkSize:          30.0,  // 火の粉サイズ基準
+    sparkRise:           1, // 火の粉の上昇量
+    sparkLifeSpeed:      0.22, // 火の粉の寿命速度
+    sparkSpread:         0.9, // 火の粉の拡散半径
+    logWarpAmount:       0.05, // 薪の歪み量
+    logWarmRimIntensity: 0.12, // 薪の暖色リム強度
+    logRoughness:        0.92, // 薪粗さ
+    fireLightBase:       2.7,  // 焚き火点光源の基準強度
+    fireLightFlickerA:   0.20, // 焚き火点光源の揺らぎA
+    fireLightFlickerB:   0.10, // 焚き火点光源の揺らぎB
+  },
+
+  /* ============================================================
+     画面遷移
+     depressionAngle : 俯角 (0=水平, 90=真上から)
+     cameraRadius    : 注視点からのカメラ距離
+     fireFinalScale  : 遷移後の焚き火スケール
+     fireInitialPos  : 初期画面の焚き火ワールド座標 [x,y,z]
+     fireFinalPos    : 遷移後の焚き火ワールド座標 [x,y,z]
+     ============================================================ */
+  transition: {
+    duration:        2.2,
+    fireFinalScale:  0.5,
+    fireScaleAccel:  0.5, // 薪+炎スケールの加速度係数 (>1:後半で加速, <1:前半で加速)
+    fireGroundedToTerrain: true, // trueで焚き火Yを地面基準で自動接地
+    fireGroundOffsetY:     0.00, // 地面からの焚き火オフセットY
+    fireInitialGroundOffsetY: 0.00, // 初期画面時のみの地面から焚き火オフセットY
+    depressionAngle: 22,
+    cameraRadius:    8.5,
+    cameraLookAt:    [0.4, 0.0, 0.0],
+    fireInitialPos:  [0.0, 0.0, -3.0], // 初期画面のみの焚き火位置
+    fireFinalPos:    [0.4, -1.7, 2.0],
+  },
+
+  /* ============================================================
+     人型オブジェクト
+     pyramidApexAngle  : 四角錐の頂角 (degrees)
+                         ─ 各三角面の「残り一角」(頂点側の角)
+                         ─ 小さい=細い, 大きい=幅広
+     headOverlapFactor : 頂点が頭球に入り込む割合
+                         0 = 球が頂点に接するだけ
+                         1 = 球の中心が頂点と一致
+     groundY           : 足元の世界 Y 座標
+     positions         : 4体の [x, z] 配置
+     ============================================================ */
+  figures: {
+    pyramidApexAngle:  40,
+    headRadius:        0.3,
+    bodyHeight:        0.9,
+    headOverlapFactor: 0.50,
+    groundY:          -2.0, // 互換用(groundedToTerrain=false時のみ使用)
+    groundedToTerrain: true, // trueで人型Yを地面基準で自動接地
+    groundOffsetY:     0.00, // 地面からの人型オフセットY
+    positions: [
+      [-1.3, 2],   // 画面左上 xy
+      [-1.0, 0.8],   // 画面上中
+      [ 2.0, 0.5],   // 画面右上
+      [ 1.9,  2.5],   // 画面右下
+    ],
+    names: ['あなた', 'Yoshi', 'Hinata', 'Takayuki'], // 人型頭上ラベル
+    nameYOffset: 0.2, // 頭頂から上へのラベルYオフセット
+    pulseColorPalette: [ // 発光色パレット(高彩度だが夜景と馴染むトーン)
+      [0.8, 0.43, 0.36], // amber
+      [0.7, 0.22, 0.30], // coral
+      [0.56, 0.80, 0.8], // sky blue
+      [0.64, 0.73, 0.36], // lime mint
+      [0.60, 0.38, 0.3], // violet pink
+    ],
+    pulsePeakIntensity: 0.3, // 0.5sec時の最大発光強度
+    pulseDurationSec: 1.4, // 発光時間(0->peak->0)
+    pulseIntervalMinSec: 6.0, // ランダム再生最小間隔
+    pulseIntervalMaxSec: 11.0, // ランダム再生最大間隔
+    pulseAudioVolume: 0.42, // mp3再生音量
+    pulseAudioFiles: [
+      './sound/bb2.mp3',
+      './sound/c2.mp3',
+      './sound/eb1.mp3',
+      './sound/f2.mp3',
+      './sound/g1.mp3',
+    ],
+    /* --- 発光設定 ---
+     * glowColors       : 1体ずつの発光色 (positions と同インデックス)
+     * emissiveIntensity : ベースマテリアルの自発光強度
+     * haloScale        : ハローメッシュのスケール倍率 (>1)
+     * haloOpacity      : ハロー最終的な不透明度 (フェードイン後) */
+    glowColors:        [0xffffff, 0xffffff, 0xffffff, 0xffffff],
+    emissiveIntensity:  1.0,
+    bodyRoughness:      0.985, // 人型のマット感(高いほどマット)
+    bodyMetalness:      0.0,
+    eyeSize:            0.15, // 頭半径に対する目サイズ比
+    eyeColor:          [0.40, 0.4, 0.00], // 目の色RGB(0-1)
+    headIdleMotionEnabled: true, // 頭の待機モーションON/OFF
+    headIdleSpeed: 0.72, // 頭待機モーション速度
+    headIdleAmpYawDeg: 8.4, // 頭左右かしげ振り幅(度)
+    headIdleAmpPitchDeg: 6.6, // 頭上下振り幅(度)
+    headIdlePhaseSpread: 3.4, // 個体ごとの位相ずらし量
+    haloScale:          1.0,
+    haloOpacity:        0.0,
+  },
+
+  /* --- タップ後に出現する背景環境 --- */
+  environment: {
+    fadeStart:         0.18, // 遷移進行率(raw 0-1)のどこから環境を表示するか
+    fadeDuration:      0.62, // フェードインに使う進行率幅
+    skyColorBottom:    [0.01, 0.01, 0.1], // 空グラデーション下側RGB(0-1)
+    skyColorTop:       [0., 0., 0.02], // 空グラデーション上側RGB(0-1): 上ほど濃く
+    mountainLayers:    3,
+    mountainWidth:     18.0,
+    mountainHeightMin: 1.8,
+    mountainHeightMax: 6.5,
+    mountainBaseY:    -5.5,
+    mountainDepthStart:-12.0,
+    mountainDepthStep: 1.45,
+    mountainDepthOffset: 2.8, // 正で砂利地形側(手前)へ寄せる
+    mountainVerticalSpread: 0.55, // 山同士の上下分散(下方向のみ)
+    mountainOpacityNear:0.7,
+    mountainOpacityFar: 0.38,
+
+    moonLightIntensity: 2.0,
+    moonAmbientBoost:   0.12,
+    moonDiscOpacity:    1.55,
+    moonDiscSize:       0.9,
+    moonColor:          [1.0, 0.95, 0.58], // 月色RGB(0-1): デフォルトは薄い黄色
+    moonPosition:       [0, 3.0, 0.5], // zは環境生成時に最背面へ再配置
+    moonBackOffset:     6.0, // 山/雲の最遠よりさらに奥へ押し込む距離
+
+    enableStars:       true, // 星描画のON/OFF
+    starCount:         240,  // 星の数
+    starSizeMin:       0.012, // 星サイズ最小
+    starSizeMax:       0.030, // 星サイズ最大
+    starYMin:           0.0, // 星の最小Y
+    starYMax:           5.0, // 星の最大Y
+    starDepthNear:     -7.5, // 星の手前側Z
+    starDepthFar:     -10.0, // 星の奥側Z
+    starOpacity:        0.72, // 星の不透明度
+    
+    cloudClusterCount: 3,
+    cloudPuffsPerCluster: 2,
+    cloudBaseY:        1.35,
+    cloudYSpread:      0.95,
+    cloudDepthNear:   -8.0,
+    cloudDepthFar:   -19.0,
+    cloudOpacity:      0.28,
+    enableCloud:      false, // 雲描画のON/OFF
+    cloudDriftSpeed:   0.06,
+    cloudRealism:      0.92, // 0=デフォルメ, 1=写実寄り
+    cloudSpreadX:      6.0, // クラスタの横方向分散幅
+    cloudSpreadZ:      3.0, // クラスタの奥行き分散幅
+    cloudFluffiness:    0.82, // 雲メッシュのふわふわ凹凸
+    cloudIntraClusterSpread: 3.8, // 1クラスター内の雲粒の分散倍率
+    cloudFlatness:      0.34, // 低いほど薄い雲パッチ
+    cloudIntraVerticalSpread: 4.0, // 1クラスター内の縦方向分散倍率
+    enableGravel:      false, // 砂利描画のON/OFF
+
+    gravelCountLarge:  10000,
+    gravelCountMedium: 10000,
+    gravelCountSmall:  10000,
+    gravelRadiusMin:   1.0,
+    gravelRadiusMax:   3.0,
+    gravelFieldWidth:  10.0,
+    gravelFieldDepth:  12.0,
+    gravelFieldWidthScale: 1.15, // 地形横幅の拡張倍率
+    gravelFieldDepthScale: 1.90, // 地形奥行きの拡張倍率(下方向の描画途切れ対策)
+    gravelFieldCenterZBias: 0.24, // 地形中心を手前(画面下)に寄せる係数
+    gravelCenterBias:  0.1,
+    gravelY:          0.02,
+    gravelBaseY:      -2.0, // 砂利地形の独立Y基準
+    gravelFollowFireY:false, // trueで焚き火Yに追従 / falseで独立
+    gravelSizeMin:     0.045, // 砂利1粒サイズの最小値
+    gravelSizeMax:     0.045, // 砂利1粒サイズの最大値
+    gravelOpacity:     10.0,
+    gravelColorDark:   0x17130f,
+    gravelColorLight:  0x2a2118,
+    gravelGroundColor: [0., 0., 0.02], // 砂利グラウンド地面色RGB(0-1)
+    gravelGroundShadowOpacity: 0.42, // 地面に落ちる影の濃さ
+    gravelRoughness:   30, // 砂利表面の粗さ(高いほどマット)
+    gravelMetalness:   0.0, // 砂利表面の金属性(高いほど反射感が強い)
+    gravelRealism:     0.7, // 0=デフォルメ(角ばる), 1=写実(丸み)
+  },
+};
+/* ============================================================ */
+
+/* ---------- レンダラー / シーン / カメラ ---------- */
+const canvas   = document.getElementById('fire');
+const frame    = document.getElementById('frame');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+
+const CAM_POS_INIT  = new THREE.Vector3(0, 0.4, 5);
+const CAM_LOOK_INIT = new THREE.Vector3(0, 0.4, 0);
+camera.position.copy(CAM_POS_INIT);
+camera.lookAt(CAM_LOOK_INIT);
+
+/* 俯瞰カメラ最終状態を CONFIG から計算 */
+const _deg  = CONFIG.transition.depressionAngle * Math.PI / 180;
+const _Rc   = CONFIG.transition.cameraRadius;
+const [_lx,_ly,_lz] = CONFIG.transition.cameraLookAt;
+const CAM_POS_FINAL  = new THREE.Vector3(_lx, _ly + Math.sin(_deg)*_Rc, _lz + Math.cos(_deg)*_Rc);
+const CAM_LOOK_FINAL = new THREE.Vector3(_lx, _ly, _lz);
+
+function resize(){
+  const w = frame.clientWidth, h = frame.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resize();
+window.addEventListener('resize', resize);
+
+/* ---------- ライティング ---------- */
+scene.add(new THREE.AmbientLight(0x2a1810, 0.6));
+const fireLight = new THREE.PointLight(0xff7a28, 3.2, 6, 1.6);
+fireLight.position.set(0, -0.1, 0.3);
+fireLight.castShadow = true;
+fireLight.shadow.mapSize.set(1024, 1024);
+fireLight.shadow.bias = -0.0015;
+fireLight.shadow.normalBias = 0.02;
+
+/* ---------- 薪マテリアル ---------- */
+function distortLogGeometry(geo, amount, seed){
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const ang = Math.atan2(z, x);
+    const radial = Math.sqrt(x*x + z*z);
+    const n1 = Math.sin(ang * 5.0 + y * 8.0 + seed * 1.7);
+    const n2 = Math.sin(ang * 9.0 - y * 5.0 + seed * 3.2);
+    const warp = 1.0 + (n1 * 0.65 + n2 * 0.35) * amount * 0.35;
+    const taper = 1.0 - Math.min(1.0, Math.abs(y) / (geo.parameters.height * 0.5)) * amount * 0.15;
+    const r = radial * warp * taper;
+    const nx = Math.cos(ang) * r;
+    const nz = Math.sin(ang) * r;
+    pos.setXYZ(i, nx, y, nz);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
+function createLogMaterial(dark){
+  const silMix = THREE.MathUtils.clamp(CONFIG.logSilhouetteMix, 0, 1);
+  const lightRgb = CONFIG.logColorLight ?? [0.36, 0.17, 0.07];
+  const darkRgb = CONFIG.logColorDark ?? [0.20, 0.09, 0.04];
+  const baseColor = new THREE.Color(
+    ...(dark ? darkRgb : lightRgb)
+  );
+  const silhouetteColor = new THREE.Color(0x070606);
+  const color = baseColor.clone().lerp(silhouetteColor, silMix);
+  return new THREE.MeshBasicMaterial({
+    color,
+    toneMapped: false,
+    transparent: false,
+    opacity: 1.0,
+    depthWrite: true,
+    depthTest: true,
+  });
+}
+
+/* ---------- 薪グループ ---------- */
+const logsGroup = new THREE.Group();
+const logMats = [];
+const logBaseColors = [];
+CONFIG.logs.forEach((def, idx) => {
+  const radialSegments = Math.max(3, Math.floor(CONFIG.logRadialSegments));
+  const logGeo = new THREE.CylinderGeometry(def.rad * CONFIG.logTaper, def.rad, def.len, radialSegments, 1);
+  const logSeed = 1307 + idx * 97;
+  distortLogGeometry(logGeo, CONFIG.fireStyle.logWarpAmount, logSeed * 0.013);
+  const logMat = createLogMaterial(def.dark);
+  const mesh = new THREE.Mesh(
+    logGeo,
+    logMat
+  );
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  logMats.push(logMat);
+  logBaseColors.push(logMat.color.clone());
+  mesh.renderOrder = 2;
+  mesh.rotation.set(def.rotX, def.rotY, def.rotZ);
+  mesh.position.set(def.x, def.y, def.z);
+  logsGroup.add(mesh);
+});
+const ashGeo = new THREE.SphereGeometry(0.45, 24, 12);
+ashGeo.scale(1, 0.25, 1);
+const ash = new THREE.Mesh(ashGeo, new THREE.MeshStandardMaterial({color:0x1a0e07, roughness:1}));
+//ash.position.set(0, -0.95, 0);
+//logsGroup.add(ash);
+
+/* ---------- 中心グロー ---------- */
+const glowMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+  uniforms:{uTime:{value:0}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`
+    varying vec2 vUv;uniform float uTime;
+    void main(){
+      vec2 p=vUv-vec2(0.5,0.42);
+      float d=length(p*vec2(1.4,1.0));
+      float f=0.92+0.08*sin(uTime*6.0)+0.05*sin(uTime*13.0);
+      float c=smoothstep(0.55,0.0,d)*f;
+      gl_FragColor=vec4(mix(vec3(0.35,0.10,0.02),vec3(1.0,0.55,0.18),c),c*0.85);
+    }`,
+});
+const glow = new THREE.Mesh(new THREE.PlaneGeometry(6,6), glowMat);
+glow.position.set(0, 0.2, -0.5);
+
+/* ---------- 火床(炭火)グロー ---------- */
+const emberBedMat = new THREE.ShaderMaterial({
+  transparent:true,
+  depthWrite:false,
+  blending:THREE.AdditiveBlending,
+  uniforms:{
+    uTime:{value:0},
+    uIntensity:{value:CONFIG.fireStyle.emberBedIntensity},
+    uPulse:{value:CONFIG.fireStyle.emberBedPulse},
+  },
+  vertexShader:`
+    varying vec2 vUv;
+    void main(){
+      vUv=uv;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+    }`,
+  fragmentShader:`
+    varying vec2 vUv;
+    uniform float uTime,uIntensity,uPulse;
+    void main(){
+      vec2 p=vUv-vec2(0.5);
+      p.x*=1.2;
+      float d=length(p);
+      float ring=smoothstep(0.52,0.08,d);
+      float ember=smoothstep(0.38,0.0,d);
+      float flick=1.0 + sin(uTime*3.0 + p.x*12.0)*uPulse*0.5 + sin(uTime*7.0 + p.y*17.0)*uPulse*0.5;
+      vec3 col=mix(vec3(0.18,0.05,0.01),vec3(1.0,0.45,0.12),ember);
+      float a=ring*flick*uIntensity;
+      if(a<0.01)discard;
+      gl_FragColor=vec4(col,a);
+    }`,
+});
+const emberBed = new THREE.Mesh(new THREE.CircleGeometry(0.86, 48), emberBedMat);
+emberBed.rotation.x = -Math.PI * 0.5;
+emberBed.position.set(0.0, -0.94, 0.0);
+
+/* ---------- VolumetricFire方式 + 火の粉 ---------- */
+const VOLUME_CORNER_NEIGHBORS = [
+  [1, 2, 4], [0, 5, 3], [0, 3, 6], [1, 7, 2],
+  [0, 6, 5], [1, 4, 7], [2, 7, 4], [3, 5, 6],
+];
+const VOLUME_INCOMING_EDGES = [
+  [-1,  2,  4, -1,  1, -1, -1, -1],
+  [ 5, -1, -1,  0, -1,  3, -1, -1],
+  [ 3, -1, -1,  6, -1, -1,  0, -1],
+  [-1,  7,  1, -1, -1, -1, -1,  2],
+  [ 6, -1, -1, -1, -1,  0,  5, -1],
+  [-1,  4, -1, -1,  7, -1, -1,  1],
+  [-1, -1,  7, -1,  2, -1, -1,  4],
+  [-1, -1, -1,  5, -1,  6,  3, -1],
+];
+
+class FirePriorityQueue {
+  constructor(){
+    this.contents = [];
+    this.sorted = false;
+  }
+  sort(){
+    this.contents.sort((a, b) => a.priority - b.priority);
+    this.sorted = true;
+  }
+  push(object, priority){
+    this.contents.push({object, priority});
+    this.sorted = false;
+  }
+  pop(){
+    if(!this.sorted) this.sort();
+    return this.contents.pop();
+  }
+  top(){
+    if(!this.sorted) this.sort();
+    return this.contents[this.contents.length - 1];
+  }
+}
+
+function createVolumetricFireMaterial(){
+  const textureLoader = new THREE.TextureLoader();
+  const nzw = textureLoader.load(`${CONFIG.fireStyle.flameTexturePath}nzw.png`);
+  nzw.wrapS = THREE.RepeatWrapping;
+  nzw.wrapT = THREE.RepeatWrapping;
+  nzw.magFilter = THREE.LinearFilter;
+  nzw.minFilter = THREE.LinearFilter;
+
+  const fireProfile = textureLoader.load(`${CONFIG.fireStyle.flameTexturePath}firetex.png`);
+  fireProfile.wrapS = THREE.ClampToEdgeWrapping;
+  fireProfile.wrapT = THREE.ClampToEdgeWrapping;
+  fireProfile.magFilter = THREE.LinearFilter;
+  fireProfile.minFilter = THREE.LinearFilter;
+
+  return new THREE.RawShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      nzw:         {value: nzw},
+      fireProfile: {value: fireProfile},
+      time:        {value: 0},
+      uIntensity:  {value: CONFIG.fireStyle.flameVolumeOpacity * CONFIG.fireStyle.flameIntensity},
+      uAlpha:      {value: CONFIG.fireStyle.flameAlpha},
+      uAlphaResponse:{value: CONFIG.fireStyle.flameAlphaResponse},
+      uBrightness: {value: CONFIG.fireStyle.flameBrightness},
+      uAnimSpeed:  {value: CONFIG.fireStyle.flameAnimationSpeed},
+      uNoiseScale: {value: CONFIG.fireStyle.flame3DNoiseScale},
+      uNoiseSpeed: {value: CONFIG.fireStyle.flame3DNoiseSpeed},
+      uDistort:    {value: CONFIG.fireStyle.flame3DTurbulence * 1.3},
+      uDensity:    {value: CONFIG.fireStyle.flameVolumeDensity},
+      uSoftness:   {value: CONFIG.fireStyle.flameSoftness},
+      uCoreBoost:  {value: CONFIG.fireStyle.flameCoreBoost},
+    },
+    vertexShader: `
+      precision highp float;
+      attribute vec3 position;
+      attribute vec3 tex;
+      uniform mat4 projectionMatrix;
+      uniform mat4 modelViewMatrix;
+      varying vec3 texOut;
+      void main(void){
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        texOut = tex;
+      }`,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D nzw;
+      uniform sampler2D fireProfile;
+      uniform float time;
+      uniform float uIntensity;
+      uniform float uAlpha;
+      uniform float uAlphaResponse;
+      uniform float uBrightness;
+      uniform float uAnimSpeed;
+      uniform float uNoiseScale;
+      uniform float uNoiseSpeed;
+      uniform float uDistort;
+      uniform float uDensity;
+      uniform float uSoftness;
+      uniform float uCoreBoost;
+      varying vec3 texOut;
+      const float modulus = 61.0;
+      const float lacunarity = 2.0;
+      const float gain = 0.5;
+
+      vec2 mBBS(vec2 val, float m){
+        val = mod(val, m);
+        return mod(val * val, m);
+      }
+      float mnoise(vec3 pos){
+        float intArg = floor(pos.z);
+        float fracArg = fract(pos.z);
+        vec2 hash = mBBS(intArg * 3.0 + vec2(0.0, 3.0), modulus);
+        vec4 g = vec4(
+          texture2D(nzw, vec2(pos.x, pos.y + hash.x) / modulus).xy,
+          texture2D(nzw, vec2(pos.x, pos.y + hash.y) / modulus).xy
+        ) * 2.0 - 1.0;
+        return mix(
+          g.x + g.y * fracArg,
+          g.z + g.w * (fracArg - 1.0),
+          smoothstep(0.0, 1.0, fracArg)
+        );
+      }
+      float turbulence(vec3 pos){
+        float sum = 0.0;
+        float freq = 1.0;
+        float amp = 1.0;
+        for(int i=0;i<4;i++){
+          sum += abs(mnoise(pos * freq)) * amp;
+          freq *= lacunarity;
+          amp *= gain;
+        }
+        return sum;
+      }
+      vec4 sampleFire(vec3 loc, vec4 scale){
+        loc.xz = loc.xz * 2.0 - 1.0;
+        vec2 st = vec2(sqrt(dot(loc.xz, loc.xz)), loc.y);
+        loc.y -= time * scale.w;
+        loc *= scale.xyz;
+        float offset = sqrt(max(0.0, st.y)) * uDistort * turbulence(loc);
+        st.y += offset;
+        if(st.y > 1.0 || st.x > 1.0){
+          return vec4(0.0);
+        }
+        vec4 result = texture2D(fireProfile, st);
+        if(st.y < 0.1){
+          result *= st.y / 0.1;
+        }
+        return result;
+      }
+      void main(void){
+        vec4 fire = sampleFire(texOut, vec4(uNoiseScale, uNoiseScale * 2.0, uNoiseScale, uNoiseSpeed * uAnimSpeed));
+        float alpha = clamp((fire.r + fire.g + fire.b) * 0.70 * uDensity, 0.0, 1.0);
+        alpha = pow(alpha, max(0.35, uSoftness));
+        alpha = clamp(alpha * uIntensity * uAlpha, 0.0, 1.0);
+        alpha = 1.0 - pow(1.0 - alpha, max(0.01, uAlphaResponse));
+        vec3 col = fire.rgb * (1.18 + uCoreBoost * 0.32) * uBrightness;
+        gl_FragColor = vec4(col, alpha);
+      }`,
+  });
+}
+
+class CameraSlicedFire {
+  constructor(width, height, depth, sliceSpacing, camera){
+    this.camera = camera;
+    this._sliceSpacing = Math.max(0.01, sliceSpacing);
+    this._viewVector = new THREE.Vector3();
+    this._sliceOffset = 0.0;
+    this._posCorners = [];
+    this._texCorners = [];
+
+    const hw = width * 0.5;
+    const hh = height * 0.5;
+    const hd = depth * 0.5;
+    this._posCorners.push(
+      new THREE.Vector3(-hw, -hh, -hd), new THREE.Vector3(hw, -hh, -hd),
+      new THREE.Vector3(-hw,  hh, -hd), new THREE.Vector3(hw,  hh, -hd),
+      new THREE.Vector3(-hw, -hh,  hd), new THREE.Vector3(hw, -hh,  hd),
+      new THREE.Vector3(-hw,  hh,  hd), new THREE.Vector3(hw,  hh,  hd),
+    );
+    this._texCorners.push(
+      new THREE.Vector3(0,0,0), new THREE.Vector3(1,0,0),
+      new THREE.Vector3(0,1,0), new THREE.Vector3(1,1,0),
+      new THREE.Vector3(0,0,1), new THREE.Vector3(1,0,1),
+      new THREE.Vector3(0,1,1), new THREE.Vector3(1,1,1),
+    );
+
+    const estimatedSlices = Math.ceil((width + height + depth) / this._sliceSpacing) + 24;
+    this._maxVertices = Math.min(65000, estimatedSlices * 12);
+    this._maxIndices = estimatedSlices * 30;
+
+    const index = new Uint16Array(this._maxIndices);
+    const position = new Float32Array(this._maxVertices * 3);
+    const tex = new Float32Array(this._maxVertices * 3);
+
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setIndex(new THREE.BufferAttribute(index, 1));
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(position, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setAttribute('tex', new THREE.BufferAttribute(tex, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setDrawRange(0, 0);
+
+    this.material = createVolumetricFireMaterial();
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.frustumCulled = false;
+  }
+
+  update(elapsed){
+    this.mesh.material.uniforms.time.value = elapsed;
+    this.mesh.material.uniforms.uIntensity.value = CONFIG.fireStyle.flameVolumeOpacity * CONFIG.fireStyle.flameIntensity;
+    this.mesh.material.uniforms.uAlpha.value = CONFIG.fireStyle.flameAlpha;
+    this.mesh.material.uniforms.uAlphaResponse.value = CONFIG.fireStyle.flameAlphaResponse;
+    this.mesh.material.uniforms.uBrightness.value = CONFIG.fireStyle.flameBrightness;
+    this.mesh.material.uniforms.uAnimSpeed.value = CONFIG.fireStyle.flameAnimationSpeed;
+    this.mesh.material.uniforms.uNoiseScale.value = CONFIG.fireStyle.flame3DNoiseScale;
+    this.mesh.material.uniforms.uNoiseSpeed.value = CONFIG.fireStyle.flame3DNoiseSpeed;
+    this.mesh.material.uniforms.uDistort.value = CONFIG.fireStyle.flame3DTurbulence * 1.3;
+    this.mesh.material.uniforms.uDensity.value = CONFIG.fireStyle.flameVolumeDensity;
+    this.mesh.material.uniforms.uSoftness.value = CONFIG.fireStyle.flameSoftness;
+    this.mesh.material.uniforms.uCoreBoost.value = CONFIG.fireStyle.flameCoreBoost;
+    this._sliceOffset = ((elapsed * CONFIG.fireStyle.flameSliceDrift) % 1.0) * this._sliceSpacing;
+    this.updateViewVector();
+    this.slice();
+    this.updateGeometry();
+  }
+
+  updateViewVector(){
+    const modelViewMatrix = new THREE.Matrix4().multiplyMatrices(
+      this.camera.matrixWorldInverse,
+      this.mesh.matrixWorld
+    );
+    this._viewVector.set(
+      -modelViewMatrix.elements[2],
+      -modelViewMatrix.elements[6],
+      -modelViewMatrix.elements[10]
+    ).normalize();
+  }
+
+  updateGeometry(){
+    if(this._indexes.length > this._maxIndices) return;
+    if((this._points.length / 3) > this._maxVertices) return;
+
+    this.geometry.index.array.set(this._indexes, 0);
+    this.geometry.attributes.position.array.set(this._points, 0);
+    this.geometry.attributes.tex.array.set(this._texCoords, 0);
+    this.geometry.setDrawRange(0, this._indexes.length);
+    this.geometry.index.needsUpdate = true;
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.tex.needsUpdate = true;
+  }
+
+  slice(){
+    this._points = [];
+    this._texCoords = [];
+    this._indexes = [];
+
+    let i;
+    const cornerDistance = [];
+    let cornerDistance0 = this._posCorners[0].dot(this._viewVector);
+    cornerDistance[0] = cornerDistance0;
+    let maxCorner = 0;
+    let minDistance = cornerDistance0;
+    let maxDistance = cornerDistance0;
+
+    for(i=1;i<8;i++){
+      cornerDistance[i] = this._posCorners[i].dot(this._viewVector);
+      if(cornerDistance[i] > maxDistance){
+        maxCorner = i;
+        maxDistance = cornerDistance[i];
+      }
+      if(cornerDistance[i] < minDistance){
+        minDistance = cornerDistance[i];
+      }
+    }
+
+    let sliceDistance = Math.floor((maxDistance - this._sliceOffset) / this._sliceSpacing) * this._sliceSpacing + this._sliceOffset;
+    const activeEdges = [];
+    let firstEdge = 0;
+    let nextEdge = 0;
+    const expirations = new FirePriorityQueue();
+
+    const createEdge = (startIndex, endIndex) => {
+      if(nextEdge >= 12) return undefined;
+      const activeEdge = {
+        expired: false,
+        startIndex,
+        endIndex,
+        deltaPos: new THREE.Vector3(),
+        deltaTex: new THREE.Vector3(),
+        pos: new THREE.Vector3(),
+        tex: new THREE.Vector3(),
+      };
+      const range = cornerDistance[startIndex] - cornerDistance[endIndex];
+      if(range !== 0){
+        const invRange = 1.0 / range;
+        activeEdge.deltaPos.subVectors(this._posCorners[endIndex], this._posCorners[startIndex]).multiplyScalar(invRange);
+        activeEdge.deltaTex.subVectors(this._texCorners[endIndex], this._texCorners[startIndex]).multiplyScalar(invRange);
+        const step = cornerDistance[startIndex] - sliceDistance;
+        activeEdge.pos.addVectors(activeEdge.deltaPos.clone().multiplyScalar(step), this._posCorners[startIndex]);
+        activeEdge.tex.addVectors(activeEdge.deltaTex.clone().multiplyScalar(step), this._texCorners[startIndex]);
+        activeEdge.deltaPos.multiplyScalar(this._sliceSpacing);
+        activeEdge.deltaTex.multiplyScalar(this._sliceSpacing);
+      }
+      expirations.push(activeEdge, cornerDistance[endIndex]);
+      activeEdges[nextEdge] = activeEdge;
+      nextEdge++;
+      return activeEdge;
+    };
+
+    for(i=0;i<3;i++){
+      const edge = createEdge(maxCorner, VOLUME_CORNER_NEIGHBORS[maxCorner][i]);
+      if(!edge) continue;
+      edge.prev = (i + 2) % 3;
+      edge.next = (i + 1) % 3;
+    }
+
+    let nextIndex = 0;
+    while(sliceDistance > minDistance){
+      while(expirations.contents.length && expirations.top().priority >= sliceDistance){
+        const edge = expirations.pop().object;
+        if(edge.expired) continue;
+        if(
+          edge.endIndex !== activeEdges[edge.prev].endIndex &&
+          edge.endIndex !== activeEdges[edge.next].endIndex
+        ){
+          edge.expired = true;
+          const edge1 = createEdge(edge.endIndex, VOLUME_INCOMING_EDGES[edge.endIndex][edge.startIndex]);
+          if(!edge1) break;
+          edge1.prev = edge.prev;
+          activeEdges[edge.prev].next = nextEdge - 1;
+          edge1.next = nextEdge;
+
+          const edge2 = createEdge(edge.endIndex, VOLUME_INCOMING_EDGES[edge.endIndex][edge1.endIndex]);
+          if(!edge2) break;
+          edge2.prev = nextEdge - 2;
+          edge2.next = edge.next;
+          activeEdges[edge2.next].prev = nextEdge - 1;
+          firstEdge = nextEdge - 1;
+        } else {
+          let prev;
+          let next;
+          if(edge.endIndex === activeEdges[edge.prev].endIndex){
+            prev = activeEdges[edge.prev];
+            next = edge;
+          } else {
+            prev = edge;
+            next = activeEdges[edge.next];
+          }
+          prev.expired = true;
+          next.expired = true;
+          const merged = createEdge(edge.endIndex, VOLUME_INCOMING_EDGES[edge.endIndex][prev.startIndex]);
+          if(!merged) break;
+          merged.prev = prev.prev;
+          activeEdges[merged.prev].next = nextEdge - 1;
+          merged.next = next.next;
+          activeEdges[merged.next].prev = nextEdge - 1;
+          firstEdge = nextEdge - 1;
+        }
+      }
+
+      let cur = firstEdge;
+      let count = 0;
+      do {
+        count++;
+        const edge = activeEdges[cur];
+        this._points.push(edge.pos.x, edge.pos.y, edge.pos.z);
+        this._texCoords.push(edge.tex.x, edge.tex.y, edge.tex.z);
+        edge.pos.add(edge.deltaPos);
+        edge.tex.add(edge.deltaTex);
+        cur = edge.next;
+      } while(cur !== firstEdge);
+
+      for(i=2;i<count;i++){
+        this._indexes.push(nextIndex, nextIndex + i - 1, nextIndex + i);
+      }
+      nextIndex += count;
+      sliceDistance -= this._sliceSpacing;
+    }
+  }
+}
+
+const volumeFireWidth  = CONFIG.fireStyle.flame3DBaseRadius * 2.2;
+const volumeFireHeight = CONFIG.fireStyle.flame3DHeight;
+const volumeFireDepth  = CONFIG.fireStyle.flameVolumeDepth;
+const volumeFire = new CameraSlicedFire(
+  volumeFireWidth,
+  volumeFireHeight,
+  volumeFireDepth,
+  CONFIG.fireStyle.flameSliceSpacing,
+  camera
+);
+const volumeFlame = volumeFire.mesh;
+volumeFlame.position.y = CONFIG.fireStyle.flameVolumeY;
+volumeFlame.renderOrder = 3;
+
+const N_BASE = CONFIG.particleCount;
+const N_MAX  = Math.floor(CONFIG.particleCount * 4);
+const seeds   = new Float32Array(N_MAX);
+const angles  = new Float32Array(N_MAX);
+const radii   = new Float32Array(N_MAX);
+const indices = new Float32Array(N_MAX);
+for(let i=0;i<N_MAX;i++){
+  seeds[i]  = Math.random();
+  angles[i] = Math.random()*Math.PI*2;
+  radii[i]  = Math.sqrt(Math.random());
+  indices[i]= i;
+}
+const flameGeo = new THREE.BufferGeometry();
+flameGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N_MAX*3), 3));
+flameGeo.setAttribute('aSeed',    new THREE.BufferAttribute(seeds,  1));
+flameGeo.setAttribute('aAngle',   new THREE.BufferAttribute(angles, 1));
+flameGeo.setAttribute('aRadiusF', new THREE.BufferAttribute(radii,  1));
+flameGeo.setAttribute('aIndex',   new THREE.BufferAttribute(indices, 1));
+
+const flameMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, depthTest:true, blending:THREE.AdditiveBlending,
+  uniforms:{
+    uTime:{value:0}, uBaseSize:{value:CONFIG.fireStyle.sparkSize},
+    uSwayX:{value:CONFIG.particleSwayX}, uSwayZ:{value:CONFIG.particleSwayZ},
+    uRise:{value:CONFIG.fireStyle.sparkRise}, uLifeSpeed:{value:CONFIG.fireStyle.sparkLifeSpeed},
+    uYStart:{value:CONFIG.particleYStart}, uYEnd:{value:CONFIG.particleYEnd},
+    uSpawnR:{value:CONFIG.fireStyle.sparkSpread},
+    uTopR:{value:CONFIG.fireStyle.sparkSpread*0.28},
+    uOpacity:{value:CONFIG.fireStyle.sparkOpacity},
+    uColorBottom:{value:new THREE.Color(...CONFIG.particleColorBottom)},
+    uColorMiddle:{value:new THREE.Color(...CONFIG.particleColorMiddle)},
+    uColorTop:{value:new THREE.Color(...CONFIG.particleColorTop)},
+    uActiveCount:{value:N_BASE},
+  },
+  vertexShader:`
+    attribute float aSeed,aAngle,aRadiusF,aIndex;
+    uniform float uTime,uBaseSize,uSwayX,uSwayZ,uRise,uLifeSpeed,uYStart,uYEnd,uSpawnR,uTopR,uActiveCount;
+    varying float vLife,vSeed;
+    void main(){
+      if(aIndex >= uActiveCount){
+        gl_PointSize = 0.0;
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        vLife = 0.0;
+        vSeed = 0.0;
+        return;
+      }
+      float life=fract(uTime*uLifeSpeed + aSeed*9.73);
+      vLife=life; vSeed=aSeed;
+      float r=mix(uSpawnR,uTopR,life) * mix(0.14,1.0,aRadiusF);
+      float yPos=mix(uYStart*0.08, uYEnd*0.74, life);
+      vec3 pos=vec3(cos(aAngle)*r,yPos,sin(aAngle)*r);
+      pos.y += life*uRise;
+      pos.x+=sin(uTime*2.2+aSeed*12.0+life*3.0)*uSwayX*life*0.55;
+      pos.z+=cos(uTime*1.7+aSeed*8.0)*uSwayZ*life*0.4;
+      vec4 mvPos=modelViewMatrix*vec4(pos,1.0);
+      float ps=uBaseSize*(0.45 + aSeed*0.65)*pow(1.0-life,0.9) + 1.2;
+      gl_PointSize=ps*projectionMatrix[1][1]/(-mvPos.z);
+      gl_Position=projectionMatrix*mvPos;
+    }`,
+  fragmentShader:`
+    uniform float uOpacity;
+    uniform vec3 uColorBottom,uColorMiddle,uColorTop;
+    varying float vLife,vSeed;
+    void main(){
+      vec2 p=gl_PointCoord-vec2(0.5);
+      float r=length(p)*2.0;
+      float alpha=pow(max(0.0,1.0-r),1.45);
+      float fadeIn=smoothstep(0.0,0.08,vLife);
+      float fadeOut=1.0-smoothstep(0.62,1.0,vLife);
+      float heat=clamp(vLife*0.85 + vSeed*0.35,0.0,1.0);
+      vec3 col=mix(uColorBottom,uColorMiddle,clamp(heat*1.25,0.0,1.0));
+      col=mix(col,uColorTop,clamp((heat-0.35)*1.7,0.0,1.0));
+      float outAlpha=alpha*fadeIn*fadeOut*uOpacity;
+      if(outAlpha<0.01)discard;
+      gl_FragColor=vec4(col,outAlpha);
+    }`,
+});
+const flamePoints = new THREE.Points(flameGeo, flameMat);
+flamePoints.frustumCulled = false;
+flamePoints.renderOrder = 3;
+
+/* ---------- 焚き火グループ (遷移アニメーション対象) ---------- */
+const fireGroup = new THREE.Group();
+fireGroup.add(logsGroup);
+fireGroup.add(emberBed);
+fireGroup.add(glow);
+fireGroup.add(volumeFlame);
+fireGroup.add(flamePoints);
+fireGroup.add(fireLight); // PointLightもグループに含め、焚き火と一緒に移動
+const FIRE_SCALE_INIT  = 1.0;
+const FIRE_SCALE_FINAL = CONFIG.fireScaleMultiplier;
+const LOGS_MIN_Y = Math.min(...CONFIG.logs.map(l => l.y));
+const GRAVEL_GROUND_Y_OFFSET = -0.06; // 砂利下地メッシュのYオフセット
+function computeGravelBaseY(){
+  if(!CONFIG.environment.gravelFollowFireY){
+    return CONFIG.environment.gravelBaseY;
+  }
+  return Math.min(
+    CONFIG.environment.gravelY,
+    CONFIG.transition.fireFinalPos[1] + LOGS_MIN_Y * CONFIG.fireScaleMultiplier - 0.18
+  );
+}
+function getGroundYBase(){
+  return computeGravelBaseY() + GRAVEL_GROUND_Y_OFFSET;
+}
+function getFireGroundOffsetEffective(){
+  return CONFIG.transition.fireGroundOffsetY;
+}
+fireGroup.scale.setScalar(FIRE_SCALE_INIT);
+scene.add(fireGroup);
+
+const FIRE_POS_INIT  = new THREE.Vector3(...CONFIG.transition.fireInitialPos);
+const FIRE_POS_FINAL = new THREE.Vector3(...CONFIG.transition.fireFinalPos);
+fireGroup.position.copy(FIRE_POS_INIT);
+
+/* ============================================================
+   人型オブジェクト
+   ─────────────────────────────────────────────────────────
+   四角錐 (ConeGeometry, radialSegments=4) + 球で構成。
+   各三角面の頂角 α から底面の外接円半径 R を以下で算出:
+
+     各三角面 = 二等辺三角形 (頂点〜隣接底面頂点の2辺が等辺)
+     余弦定理より:  cos α = H² / (R² + H²)
+     整理して:      R = H · √((1 - cos α) / cos α)
+
+   頭部球の中心 Y (グループローカル座標):
+     headLocalY = H/2 + headRadius × (1 - headOverlapFactor)
+     headOverlapFactor = 0 → 球が頂点に接する
+     headOverlapFactor = 1 → 球の中心が頂点に一致 (最大重なり)
+   ============================================================ */
+
+/* マテリアルを配列で管理 (フェードイン時に一括 opacity 更新) */
+const figBaseMats = [];   // ベース: emissive 付き MeshStandard
+const figHaloMats = [];   // ハロー: AdditiveBlending MeshBasic
+
+/*
+ * createFigure(glowColor)
+ *   glowColor : 発光色 (0xffffff 等)
+ *
+ * 発光の仕組み:
+ *   ① baseMat の emissive で、オブジェクト自体が指定色に光って見える
+ *   ② haloMat のハローメッシュ (ひと回り大きい、AdditiveBlending) で
+ *      輪郭外にぼんやりと光をにじませる
+ */
+function createFigure(glowColor){
+  const H = CONFIG.figures.bodyHeight;
+  const headR = CONFIG.figures.headRadius;
+  const figRoughness = THREE.MathUtils.clamp(CONFIG.figures.bodyRoughness ?? 0.985, 0, 1);
+  const figMetalness = THREE.MathUtils.clamp(CONFIG.figures.bodyMetalness ?? 0.0, 0, 1);
+  const eyeSizeRatio = THREE.MathUtils.clamp(CONFIG.figures.eyeSize ?? 0.115, 0.04, 0.30);
+  const eyeColorRgb = CONFIG.figures.eyeColor ?? [0.10, 0.08, 0.08];
+  const eyeColor = new THREE.Color(
+    THREE.MathUtils.clamp(eyeColorRgb[0] ?? 0.1, 0, 1),
+    THREE.MathUtils.clamp(eyeColorRgb[1] ?? 0.08, 0, 1),
+    THREE.MathUtils.clamp(eyeColorRgb[2] ?? 0.08, 0, 1)
+  );
+  const angleNorm = THREE.MathUtils.clamp(CONFIG.figures.pyramidApexAngle / 60, 0.55, 1.25);
+  const torsoTop = H * (0.24 + 0.12 * angleNorm);
+  const torsoBottom = torsoTop * 0.78;
+  const torsoH = H * 0.62;
+  const legH = H * 0.20;
+  const shoulderY = -H * 0.02;
+  const headLocalY = shoulderY + torsoH * 0.56 + headR * (1.05 - CONFIG.figures.headOverlapFactor * 0.55);
+
+  const baseMat = new THREE.MeshStandardMaterial({
+    color:             0xffffff,
+    emissive:          new THREE.Color(glowColor),
+    emissiveIntensity: CONFIG.figures.emissiveIntensity * 0.10,
+    roughness:         figRoughness,
+    metalness:         figMetalness,
+    transparent:       true,
+    opacity:           0.0,
+  });
+  figBaseMats.push(baseMat);
+
+  const accentMat = new THREE.MeshStandardMaterial({
+    color:             0xffffff,
+    emissive:          new THREE.Color(0x000000),
+    emissiveIntensity: 0.0,
+    roughness:         THREE.MathUtils.clamp(figRoughness + 0.01, 0, 1),
+    metalness:         figMetalness,
+    transparent:       true,
+    opacity:           0.0,
+  });
+  figBaseMats.push(accentMat);
+
+  const limbMat = new THREE.MeshStandardMaterial({
+    color:             0xffffff,
+    emissive:          new THREE.Color(0x000000),
+    emissiveIntensity: 0.0,
+    roughness:         THREE.MathUtils.clamp(figRoughness + 0.005, 0, 1),
+    metalness:         figMetalness,
+    transparent:       true,
+    opacity:           0.0,
+  });
+  figBaseMats.push(limbMat);
+
+  const eyeMat = new THREE.MeshBasicMaterial({
+    color:       eyeColor,
+    transparent: true,
+    opacity:     0.0,
+    depthWrite:  false,
+  });
+  figBaseMats.push(eyeMat);
+
+  const haloMat = new THREE.MeshBasicMaterial({
+    color:       new THREE.Color(glowColor),
+    transparent: true,
+    opacity:     0.0,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+  });
+  figHaloMats.push(haloMat);
+
+  const group = new THREE.Group();
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(torsoTop * 0.58, torsoH * 0.54, 8, 16), baseMat);
+  torso.position.y = shoulderY;
+  torso.scale.set(1.0, 0.92, 0.82);
+  group.add(torso);
+
+  const legGeo = new THREE.CylinderGeometry(torsoBottom * 0.18, torsoBottom * 0.20, legH, 8);
+  const legL = new THREE.Mesh(legGeo, limbMat);
+  const legR = new THREE.Mesh(legGeo, limbMat);
+  legL.position.set(-torsoBottom * 0.22, shoulderY - torsoH * 0.42, 0.0);
+  legR.position.set( torsoBottom * 0.22, shoulderY - torsoH * 0.42, 0.0);
+  group.add(legL, legR);
+
+  const armGeo = new THREE.SphereGeometry(headR * 0.28, 10, 8);
+  const armL = new THREE.Mesh(armGeo, baseMat);
+  const armR = new THREE.Mesh(armGeo, baseMat);
+  armL.position.set(-torsoTop * 0.82, shoulderY + torsoH * 0.12, torsoTop * 0.05);
+  armR.position.set( torsoTop * 0.82, shoulderY + torsoH * 0.12, torsoTop * 0.05);
+  group.add(armL, armR);
+
+  const headRig = new THREE.Group();
+  headRig.position.y = headLocalY;
+  group.add(headRig);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 16, 12), baseMat);
+  head.position.y = 0;
+  head.scale.set(1.0, 0.92, 1.0);
+  headRig.add(head);
+
+  const eyeGeo = new THREE.SphereGeometry(headR * eyeSizeRatio, 10, 8);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-headR * 0.33, headR * 0.03, headR * 0.82);
+  eyeR.position.set( headR * 0.33, headR * 0.03, headR * 0.82);
+  headRig.add(eyeL, eyeR);
+
+  const headHalo = new THREE.Mesh(new THREE.SphereGeometry(headR * 1.08, 12, 10), haloMat);
+  headHalo.position.y = 0;
+  headHalo.scale.setScalar(CONFIG.figures.haloScale);
+  headRig.add(headHalo);
+
+  // ローカル座標での実メッシュ最低Yを保持して、厳密接地に使う
+  let minY = Infinity;
+  group.traverse(obj => {
+    if(!obj.isMesh) return;
+    if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
+    const bb = obj.geometry.boundingBox;
+    if(!bb) return;
+    const y0 = bb.min.y * obj.scale.y + obj.position.y;
+    if(y0 < minY) minY = y0;
+  });
+  group.userData.localMinY = Number.isFinite(minY) ? minY : -H * 0.5;
+  group.userData.headRig = headRig;
+  group.userData.pulseBaseMat = baseMat;
+  group.userData.pulseHaloMat = haloMat;
+  group.userData.pulseColor = new THREE.Color(1, 1, 1);
+  group.userData.pulseStartTime = -1;
+  group.traverse(obj => {
+    if(!obj.isMesh) return;
+    obj.castShadow = true;
+    obj.receiveShadow = false;
+  });
+
+  return group;
+}
+
+const figures = CONFIG.figures.positions.map(([fx, fz], i) => {
+  const color = CONFIG.figures.glowColors[i] ?? 0xffffff;
+  const fig = createFigure(color);
+  const figGroundBaseY = CONFIG.figures.groundedToTerrain
+    ? getGroundYBase() + CONFIG.figures.groundOffsetY
+    : CONFIG.figures.groundY;
+  fig.position.set(fx, figGroundBaseY - (fig.userData.localMinY ?? -CONFIG.figures.bodyHeight/2), fz);
+  fig.lookAt(0, fig.position.y + 0.12, 0);
+  scene.add(fig);
+  return fig;
+});
+const FIGURE_LOOK_Y_OFFSET = 0.12;
+const nameLayerEl = document.getElementById('nameLayer');
+const figureNames = CONFIG.figures.names ?? ['あなた', 'Yoshi', 'Hinata', 'Takayuki'];
+const nameTags = figures.map((_, i) => {
+  const tag = document.createElement('div');
+  tag.className = 'name-tag';
+  tag.textContent = figureNames[i] ?? `Friend ${i + 1}`;
+  nameLayerEl.appendChild(tag);
+  return tag;
+});
+const _nameWorld = new THREE.Vector3();
+
+/* ---------- 人型: 音+発光パルス ---------- */
+const figurePulseAudioPlayers = (CONFIG.figures.pulseAudioFiles ?? [])
+  .filter(src => typeof src === 'string' && src.trim().length > 0)
+  .map(src => {
+    const audio = new Audio(src);
+    audio.preload = 'auto';
+    audio.volume = THREE.MathUtils.clamp(CONFIG.figures.pulseAudioVolume ?? 0.42, 0, 1);
+    return audio;
+  });
+let figurePulseAudioPrimed = false;
+let figurePulseLoopStarted = false;
+const figurePulseTimerIds = [];
+const takibiLoopAudio = new Audio('./sound/takibi.mp3');
+takibiLoopAudio.preload = 'auto';
+takibiLoopAudio.loop = true;
+takibiLoopAudio.volume = 0.55;
+let takibiLoopStarted = false;
+
+function configColorToThree(value){
+  if(Array.isArray(value)){
+    return new THREE.Color(
+      THREE.MathUtils.clamp(value[0] ?? 1.0, 0, 1),
+      THREE.MathUtils.clamp(value[1] ?? 1.0, 0, 1),
+      THREE.MathUtils.clamp(value[2] ?? 1.0, 0, 1)
+    );
+  }
+  if(typeof value === 'number') return new THREE.Color(value);
+  return new THREE.Color(1, 1, 1);
+}
+
+function shuffleArrayInPlace(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function assignPulseColorsToFigures(){
+  const palette = (CONFIG.figures.pulseColorPalette ?? []).map(configColorToThree);
+  if(palette.length === 0){
+    figures.forEach(fig => { fig.userData.pulseColor = new THREE.Color(1, 1, 1); });
+    return;
+  }
+  shuffleArrayInPlace(palette);
+  figures.forEach((fig, i) => {
+    fig.userData.pulseColor = palette[i % palette.length].clone();
+  });
+}
+
+function primePulseAudio(){
+  if(figurePulseAudioPrimed) return;
+  figurePulseAudioPrimed = true;
+  figurePulseAudioPlayers.forEach(audio => {
+    audio.muted = true;
+    const p = audio.play();
+    if(p && typeof p.then === 'function'){
+      p.then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+      }).catch(() => {
+        audio.muted = false;
+      });
+    } else {
+      audio.muted = false;
+    }
+  });
+}
+
+function playRandomPulseAudio(){
+  if(figurePulseAudioPlayers.length === 0) return;
+  const pick = figurePulseAudioPlayers[Math.floor(Math.random() * figurePulseAudioPlayers.length)];
+  pick.volume = THREE.MathUtils.clamp(CONFIG.figures.pulseAudioVolume ?? 0.42, 0, 1);
+  try{
+    pick.currentTime = 0;
+  }catch(_e){}
+  const p = pick.play();
+  if(p && typeof p.catch === 'function') p.catch(() => {});
+}
+
+function scheduleNextFigurePulse(figureIndex){
+  if(!figurePulseLoopStarted) return;
+  if(figureIndex < 0 || figureIndex >= figures.length) return;
+  const minSec = Math.max(0.15, CONFIG.figures.pulseIntervalMinSec ?? 5.0);
+  const maxSec = Math.max(minSec, CONFIG.figures.pulseIntervalMaxSec ?? 11.0);
+  const delayMs = (minSec + Math.random() * (maxSec - minSec)) * 1000;
+  figurePulseTimerIds[figureIndex] = window.setTimeout(() => {
+    const fig = figures[figureIndex];
+    if(fig){
+      fig.userData.pulseStartTime = (performance.now() - _t0) / 1000;
+      playRandomPulseAudio();
+    }
+    scheduleNextFigurePulse(figureIndex);
+  }, delayMs);
+}
+
+function startFigurePulseLoop(){
+  if(figurePulseLoopStarted) return;
+  figurePulseLoopStarted = true;
+  for(let i=0;i<figurePulseTimerIds.length;i++){
+    if(figurePulseTimerIds[i] !== undefined){
+      clearTimeout(figurePulseTimerIds[i]);
+    }
+    figurePulseTimerIds[i] = undefined;
+  }
+  for(let i=0;i<figures.length;i++){
+    scheduleNextFigurePulse(i);
+  }
+}
+
+function startTakibiLoopAudio(){
+  if(takibiLoopStarted) return;
+  takibiLoopStarted = true;
+  const p = takibiLoopAudio.play();
+  if(p && typeof p.catch === 'function'){
+    p.catch(() => {
+      takibiLoopStarted = false;
+    });
+  }
+}
+
+/* ---------- タップ後にフェードインする環境 ---------- */
+const envFadeEntries = []; // { mat, targetOpacity }
+const cloudDriftEntries = []; // { group, baseX, baseZ, speed, amp, phase }
+const environmentGroup = new THREE.Group();
+scene.add(environmentGroup);
+figures.forEach(fig => { fig.visible = false; });
+environmentGroup.visible = false;
+
+function registerEnvMat(mat, targetOpacity){
+  mat.transparent = true;
+  mat.opacity = 0.0;
+  envFadeEntries.push({mat, targetOpacity});
+}
+
+function createSeededRandom(seed){
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function ridgeNoise01(x, seed){
+  const n1 = Math.sin((x * 3.1 + seed * 1.37) * Math.PI * 2.0) * 0.5 + 0.5;
+  const n2 = Math.sin((x * 7.8 + seed * 2.73) * Math.PI * 2.0 + 1.2) * 0.5 + 0.5;
+  const n3 = Math.sin((x * 14.6 + seed * 5.11) * Math.PI * 2.0 + 0.7) * 0.5 + 0.5;
+  return THREE.MathUtils.clamp(n1 * 0.56 + n2 * 0.31 + n3 * 0.13, 0, 1);
+}
+
+function cloudNoise3(x,y,z,seed){
+  const a = Math.sin((x*2.3 + y*1.7 + z*2.9 + seed*0.73) * Math.PI * 2.0);
+  const b = Math.sin((x*5.1 - y*3.9 + z*4.2 + seed*1.31) * Math.PI * 2.0 + 0.7);
+  const c = Math.sin((x*9.2 + y*7.4 - z*6.8 + seed*2.11) * Math.PI * 2.0 + 1.2);
+  return (a * 0.55 + b * 0.30 + c * 0.15);
+}
+
+function toColorFromRgbArray(rgb){
+  return new THREE.Color(
+    THREE.MathUtils.clamp(rgb?.[0] ?? 0.0, 0, 1),
+    THREE.MathUtils.clamp(rgb?.[1] ?? 0.0, 0, 1),
+    THREE.MathUtils.clamp(rgb?.[2] ?? 0.0, 0, 1)
+  );
+}
+
+function createVerticalGradientTexture(bottomColor, topColor){
+  const cvs = document.createElement('canvas');
+  cvs.width = 4;
+  cvs.height = 256;
+  const ctx = cvs.getContext('2d');
+  const grad = ctx.createLinearGradient(0, cvs.height, 0, 0);
+  grad.addColorStop(0, `#${bottomColor.getHexString()}`);
+  grad.addColorStop(1, `#${topColor.getHexString()}`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, cvs.width, cvs.height);
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function createFluffyCloudGeometry(realism, fluffiness){
+  const ws = Math.round(THREE.MathUtils.lerp(10, 22, realism));
+  const hs = Math.round(THREE.MathUtils.lerp(8, 16, realism));
+  const geo = new THREE.SphereGeometry(1.0, ws, hs);
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+    const len = Math.max(0.0001, Math.sqrt(vx*vx + vy*vy + vz*vz));
+    const nx = vx/len, ny = vy/len, nz = vz/len;
+    const n = cloudNoise3(nx, ny, nz, 0.37 + realism * 2.0);
+    const wobble = 1.0 + n * THREE.MathUtils.lerp(0.08, 0.22, fluffiness) * THREE.MathUtils.lerp(0.55, 1.0, realism);
+    pos.setXYZ(i, nx * wobble, ny * wobble, nz * wobble);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createEnvironment(){
+  const [fireX,,fireZ] = CONFIG.transition.fireFinalPos;
+  const env = CONFIG.environment;
+  const rng = createSeededRandom(20260416);
+  const gravelBaseY = computeGravelBaseY();
+
+  // 空グラデーション (RGB設定)
+  const skyBottom = toColorFromRgbArray(env.skyColorBottom);
+  const skyTop = toColorFromRgbArray(env.skyColorTop);
+  const skyTexture = createVerticalGradientTexture(skyBottom, skyTop);
+  const skyMat = new THREE.MeshBasicMaterial({
+    map: skyTexture,
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+  registerEnvMat(skyMat, 1.0);
+  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(52, 24, 18), skyMat);
+  skyDome.position.set(fireX, -2.0, -8.0);
+  skyDome.renderOrder = -100;
+  environmentGroup.add(skyDome);
+
+  // 月の光源 + 月の見た目
+  const [moonX, moonY] = env.moonPosition;
+  const farEnvZ = Math.min(env.mountainDepthStart, env.cloudDepthFar);
+  const moonZ = farEnvZ - env.moonBackOffset;
+  const moonColor = new THREE.Color(...env.moonColor);
+  const moonFill = new THREE.DirectionalLight(moonColor, env.moonLightIntensity);
+  moonFill.position.set(moonX, moonY, moonZ);
+  environmentGroup.add(moonFill);
+  const moonAmbient = new THREE.HemisphereLight(moonColor, 0x1a140f, env.moonAmbientBoost);
+  environmentGroup.add(moonAmbient);
+
+  const moonDiscMat = new THREE.MeshBasicMaterial({color:moonColor, depthWrite:false});
+  registerEnvMat(moonDiscMat, env.moonDiscOpacity);
+  const moonDisc = new THREE.Mesh(new THREE.SphereGeometry(1.0, 20, 16), moonDiscMat);
+  moonDisc.position.set(moonX, moonY, moonZ);
+  moonDisc.scale.setScalar(env.moonDiscSize);
+  moonDisc.renderOrder = -10;
+  environmentGroup.add(moonDisc);
+
+  // 星
+  if(env.enableStars){
+    const starCount = Math.max(0, Math.floor(env.starCount));
+    const starGeo = new THREE.SphereGeometry(1.0, 8, 8);
+    const starMat = new THREE.MeshBasicMaterial({
+      color: 0xeff3ff,
+      depthWrite: false,
+      depthTest: true,
+    });
+    registerEnvMat(starMat, env.starOpacity);
+    const stars = new THREE.InstancedMesh(starGeo, starMat, starCount);
+    stars.renderOrder = -30;
+    const _m = new THREE.Matrix4();
+    const _p = new THREE.Vector3();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3();
+    const halfW = env.mountainWidth * 0.65;
+    for(let i=0;i<starCount;i++){
+      _p.set(
+        fireX + (rng() - 0.5) * halfW * 2.0,
+        THREE.MathUtils.lerp(env.starYMin, env.starYMax, rng()),
+        THREE.MathUtils.lerp(env.starDepthNear, env.starDepthFar, rng())
+      );
+      const sc = THREE.MathUtils.lerp(env.starSizeMin, env.starSizeMax, Math.pow(rng(), 1.3));
+      _s.set(sc, sc, sc);
+      _m.compose(_p, _q, _s);
+      stars.setMatrixAt(i, _m);
+    }
+    stars.instanceMatrix.needsUpdate = true;
+    environmentGroup.add(stars);
+  }
+
+  // 山: 多層のリッジ形状を遠景に重ねる
+  const mountainFarColor  = new THREE.Color(0x06080d);
+  const mountainNearColor = new THREE.Color(0x1a1f28);
+  const mountainLayerDenom = Math.max(1, env.mountainLayers - 1);
+  for(let layer=0; layer<env.mountainLayers; layer++){
+    const tLayer = layer / mountainLayerDenom;
+    const width  = env.mountainWidth * (1.0 + tLayer * 0.45);
+    const halfW  = width * 0.5;
+    const baseY  = env.mountainBaseY - tLayer * 0.22;
+    const height = THREE.MathUtils.lerp(env.mountainHeightMin, env.mountainHeightMax, tLayer);
+    const seg    = 180;
+    const shape  = new THREE.Shape();
+    shape.moveTo(-halfW, baseY - 0.20);
+    for(let i=0;i<=seg;i++){
+      const nx = i / seg;
+      const x = -halfW + nx * width;
+      const ridgeA = ridgeNoise01(nx, 0.31 + layer * 0.29);
+      const ridgeB = ridgeNoise01(nx * 1.7, 1.17 + layer * 0.41);
+      const shoulders = Math.pow(Math.sin(nx * Math.PI), 0.62);
+      const y = baseY + height * (0.18 + (ridgeA * 0.75 + ridgeB * 0.25) * shoulders);
+      shape.lineTo(x, y);
+    }
+    shape.lineTo(halfW, baseY - 0.20);
+    shape.lineTo(-halfW, baseY - 0.20);
+
+    const mountainGeo = new THREE.ExtrudeGeometry(shape, {depth: 0.45 + tLayer * 0.20, bevelEnabled: false, steps: 1});
+    const mountainMat = new THREE.MeshStandardMaterial({
+      color: mountainFarColor.clone().lerp(mountainNearColor, tLayer),
+      roughness: 1.0,
+      metalness: 0.0,
+    });
+    registerEnvMat(mountainMat, THREE.MathUtils.lerp(env.mountainOpacityFar, env.mountainOpacityNear, tLayer));
+
+    const mountain = new THREE.Mesh(mountainGeo, mountainMat);
+    const yDown = rng() * env.mountainVerticalSpread * (0.45 + 0.55 * tLayer);
+    mountain.position.set(
+      THREE.MathUtils.lerp(-1.2, 1.2, rng()),
+      -yDown, // 下方向のみに分散させ、既存の最上位を超えない
+      env.mountainDepthStart - layer * env.mountainDepthStep + env.mountainDepthOffset
+    );
+    mountain.rotation.x = -0.03 - tLayer * 0.04;
+    environmentGroup.add(mountain);
+  }
+
+  // 雲: 写実寄りのクラスタ(コア+ウィスプ)
+  if(env.enableCloud){
+  const cloudRealism = THREE.MathUtils.clamp(env.cloudRealism, 0.0, 1.0);
+  const cloudIntraSpread = Math.max(0.1, env.cloudIntraClusterSpread);
+  const cloudIntraVerticalSpread = Math.max(0.1, env.cloudIntraVerticalSpread);
+  const cloudGeo = createFluffyCloudGeometry(cloudRealism, THREE.MathUtils.clamp(env.cloudFluffiness, 0.0, 1.0));
+  const cloudFlatness = THREE.MathUtils.clamp(env.cloudFlatness, 0.08, 0.65);
+  for(let c=0;c<env.cloudClusterCount;c++){
+    const depthT = c / Math.max(1, env.cloudClusterCount - 1);
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0xe8e1cc).lerp(new THREE.Color(0xcfc7b2), depthT),
+      roughness: 1.0,
+      metalness: 0.0,
+      depthWrite: false,
+    });
+    const cloudWispMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0xf1ebd8).lerp(new THREE.Color(0xd8d0bc), depthT),
+      roughness: 1.0,
+      metalness: 0.0,
+      depthWrite: false,
+    });
+    registerEnvMat(cloudMat, env.cloudOpacity * THREE.MathUtils.lerp(0.92, 1.05, 1.0 - depthT));
+    registerEnvMat(cloudWispMat, env.cloudOpacity * 0.38 * THREE.MathUtils.lerp(0.95, 1.05, 1.0 - depthT));
+
+    const cluster = new THREE.Group();
+    const clusterT = (c + 0.5) / Math.max(1, env.cloudClusterCount);
+    const clusterX = THREE.MathUtils.lerp(-env.cloudSpreadX * 0.5, env.cloudSpreadX * 0.5, clusterT) + (rng() - 0.5) * 2.2;
+    const clusterY = env.cloudBaseY + (rng() - 0.5) * env.cloudYSpread;
+    const clusterZ = THREE.MathUtils.lerp(env.cloudDepthNear, env.cloudDepthFar, clusterT) + (rng() - 0.5) * env.cloudSpreadZ * 0.55;
+    const puffCount = Math.max(3, Math.floor(env.cloudPuffsPerCluster * THREE.MathUtils.lerp(0.9, 1.45, cloudRealism)));
+    const wispCount = Math.max(2, Math.floor(puffCount * 0.30));
+
+    for(let i=0;i<puffCount;i++){
+      const puff = new THREE.Mesh(cloudGeo, cloudMat);
+      const ang = rng() * Math.PI * 2.0;
+      const rad = Math.pow(rng(), THREE.MathUtils.lerp(1.05, 0.72, cloudRealism)) * THREE.MathUtils.lerp(0.45, 1.55, rng()) * cloudIntraSpread;
+      const px = Math.cos(ang) * rad * THREE.MathUtils.lerp(1.4, 2.3, cloudRealism);
+      const arch = Math.pow(Math.sin((i / Math.max(1, puffCount - 1)) * Math.PI), THREE.MathUtils.lerp(2.0, 1.35, cloudRealism));
+      const py = ((rng() - 0.5) * THREE.MathUtils.lerp(0.08, 0.20, cloudRealism)
+               + arch * THREE.MathUtils.lerp(0.04, 0.12, cloudRealism)) * cloudIntraVerticalSpread;
+      const pz = Math.sin(ang) * rad * THREE.MathUtils.lerp(0.30, 0.55, cloudRealism);
+      const s  = THREE.MathUtils.lerp(0.16, 0.56, rng());
+      puff.position.set(px, py, pz);
+      puff.scale.set(
+        s * THREE.MathUtils.lerp(1.8, 3.8, rng()),
+        s * THREE.MathUtils.lerp(cloudFlatness * 0.72, cloudFlatness * 1.35, rng()),
+        s * THREE.MathUtils.lerp(0.75, 1.35, rng())
+      );
+      cluster.add(puff);
+    }
+    for(let i=0;i<wispCount;i++){
+      const puff = new THREE.Mesh(cloudGeo, cloudWispMat);
+      const ang = rng() * Math.PI * 2.0;
+      const rad = THREE.MathUtils.lerp(1.2, 2.6, rng()) * cloudIntraSpread;
+      const px = Math.cos(ang) * rad;
+      const py = (rng() - 0.5) * 0.14 * cloudIntraVerticalSpread;
+      const pz = Math.sin(ang) * rad * 0.42;
+      const s  = THREE.MathUtils.lerp(0.10, 0.28, rng());
+      puff.position.set(px, py, pz);
+      puff.scale.set(
+        s * THREE.MathUtils.lerp(2.0, 4.4, rng()),
+        s * THREE.MathUtils.lerp(cloudFlatness * 0.45, cloudFlatness * 0.9, rng()),
+        s * THREE.MathUtils.lerp(0.8, 1.45, rng())
+      );
+      cluster.add(puff);
+    }
+
+    cluster.position.set(clusterX, clusterY, clusterZ);
+    environmentGroup.add(cluster);
+    cloudDriftEntries.push({
+      group: cluster,
+      baseX: clusterX,
+      baseZ: clusterZ,
+      speed: env.cloudDriftSpeed * THREE.MathUtils.lerp(0.7, 1.35, rng()),
+      amp: THREE.MathUtils.lerp(0.12, 0.40, rng()),
+      phase: rng() * Math.PI * 2.0,
+    });
+  }
+  }
+
+  // 砂利ベース地形: 色固定面 + 影専用面（空色の影響を受けず、影だけ落とす）
+  const groundMat = new THREE.MeshBasicMaterial({
+    color:toColorFromRgbArray(env.gravelGroundColor ?? [0.06, 0.05, 0.04]),
+    toneMapped:false,
+  });
+  registerEnvMat(groundMat, 0.94);
+  const groundShadowOpacity = THREE.MathUtils.clamp(env.gravelGroundShadowOpacity ?? 0.42, 0, 1);
+  const groundShadowMat = new THREE.ShadowMaterial({opacity: groundShadowOpacity});
+  registerEnvMat(groundShadowMat, groundShadowOpacity);
+  const terrainW = env.gravelFieldWidth * Math.max(0.1, env.gravelFieldWidthScale);
+  const terrainD = env.gravelFieldDepth * Math.max(0.1, env.gravelFieldDepthScale);
+  const terrainCenterX = fireX + 0.45;
+  const terrainCenterZ = fireZ + 1.25 + terrainD * env.gravelFieldCenterZBias;
+  const terrainGeo = new THREE.PlaneGeometry(terrainW, terrainD, 72, 48);
+  const terrainPos = terrainGeo.attributes.position;
+  for(let i=0;i<terrainPos.count;i++){
+    const x = terrainPos.getX(i) / terrainW;
+    const z = terrainPos.getY(i) / terrainD;
+    const h1 = Math.sin((x * 8.5 + 0.37) * Math.PI * 2.0) * 0.020;
+    const h2 = Math.sin((z * 11.3 + 0.81) * Math.PI * 2.0) * 0.015;
+    const h3 = Math.sin(((x + z) * 5.4 + 0.12) * Math.PI * 2.0) * 0.012;
+    terrainPos.setZ(i, h1 + h2 + h3);
+  }
+  terrainGeo.computeVertexNormals();
+  const gravelGround = new THREE.Mesh(terrainGeo, groundMat);
+  gravelGround.rotation.x = -Math.PI * 0.5;
+  gravelGround.position.set(terrainCenterX, gravelBaseY + GRAVEL_GROUND_Y_OFFSET, terrainCenterZ);
+  gravelGround.renderOrder = 0;
+  gravelGround.receiveShadow = false;
+  environmentGroup.add(gravelGround);
+  const gravelGroundShadow = new THREE.Mesh(terrainGeo.clone(), groundShadowMat);
+  gravelGroundShadow.rotation.x = -Math.PI * 0.5;
+  gravelGroundShadow.position.set(terrainCenterX, gravelBaseY + GRAVEL_GROUND_Y_OFFSET + 0.001, terrainCenterZ);
+  gravelGroundShadow.renderOrder = 1;
+  gravelGroundShadow.receiveShadow = true;
+  environmentGroup.add(gravelGroundShadow);
+
+  // 砂利: InstancedMeshで密度を上げる（enableGravel=falseなら粒のみ非表示）
+  if(env.enableGravel){
+  const gravelRealism = THREE.MathUtils.clamp(env.gravelRealism, 0.0, 1.0);
+  const gravelDetail = gravelRealism >= 0.67 ? 1 : 0;
+  const gravelLargeGeo = new THREE.DodecahedronGeometry(1.0, gravelDetail);
+  const gravelMediumGeo = new THREE.OctahedronGeometry(1.0, gravelDetail);
+  const gravelSmallGeo = new THREE.IcosahedronGeometry(1.0, gravelDetail);
+  const gravelLargeMat = new THREE.MeshStandardMaterial({
+    color:env.gravelColorDark,
+    roughness:THREE.MathUtils.clamp(env.gravelRoughness, 0.0, 1.0),
+    metalness:THREE.MathUtils.clamp(env.gravelMetalness, 0.0, 1.0),
+    flatShading: gravelRealism < 0.45,
+  });
+  const gravelMediumMat = new THREE.MeshStandardMaterial({
+    color:0x1f1913,
+    roughness:THREE.MathUtils.clamp(env.gravelRoughness * 0.96, 0.0, 1.0),
+    metalness:THREE.MathUtils.clamp(env.gravelMetalness, 0.0, 1.0),
+    flatShading: gravelRealism < 0.45,
+  });
+  const gravelSmallMat = new THREE.MeshStandardMaterial({
+    color:env.gravelColorLight,
+    roughness:THREE.MathUtils.clamp(env.gravelRoughness * 0.92, 0.0, 1.0),
+    metalness:THREE.MathUtils.clamp(env.gravelMetalness, 0.0, 1.0),
+    flatShading: gravelRealism < 0.45,
+  });
+  registerEnvMat(gravelLargeMat, env.gravelOpacity * 0.95);
+  registerEnvMat(gravelMediumMat, env.gravelOpacity * 0.90);
+  registerEnvMat(gravelSmallMat, env.gravelOpacity * 0.85);
+
+  const gravelLarge = new THREE.InstancedMesh(gravelLargeGeo, gravelLargeMat, env.gravelCountLarge);
+  const gravelMedium = new THREE.InstancedMesh(gravelMediumGeo, gravelMediumMat, env.gravelCountMedium);
+  const gravelSmall = new THREE.InstancedMesh(gravelSmallGeo, gravelSmallMat, env.gravelCountSmall);
+  gravelLarge.renderOrder = 0;
+  gravelMedium.renderOrder = 0;
+  gravelSmall.renderOrder = 0;
+  const _m = new THREE.Matrix4();
+  const _p = new THREE.Vector3();
+  const _q = new THREE.Quaternion();
+  const _s = new THREE.Vector3();
+  const _e = new THREE.Euler();
+
+  function sampleGravelPos(){
+    // 中心周りの密度を保ちつつ、画面下部全体にも敷き詰める
+    if(rng() < env.gravelCenterBias){
+      const ang = rng() * Math.PI * 2.0;
+      const rr  = THREE.MathUtils.lerp(env.gravelRadiusMin * 0.65, env.gravelRadiusMax * 1.10, Math.pow(rng(), 0.75));
+      const warp = 0.82 + 0.36 * Math.sin(ang * 2.8 + rng() * 3.2);
+      return new THREE.Vector3(
+        fireX + Math.cos(ang) * rr * warp + (rng() - 0.5) * 0.20,
+        gravelBaseY + (rng() - 0.5) * 0.08,
+        fireZ + Math.sin(ang) * rr * warp + (rng() - 0.5) * 0.20
+      );
+    }
+    return new THREE.Vector3(
+      terrainCenterX + (rng() - 0.5) * terrainW * 0.98,
+      gravelBaseY + (rng() - 0.5) * 0.07,
+      terrainCenterZ + (rng() - 0.5) * terrainD * 0.96
+    );
+  }
+
+  function confineToTerrain(pos, margin){
+    const halfW = Math.max(0.2, terrainW * 0.5 - margin);
+    const halfD = Math.max(0.2, terrainD * 0.5 - margin);
+    pos.x = THREE.MathUtils.clamp(pos.x, terrainCenterX - halfW, terrainCenterX + halfW);
+    pos.z = THREE.MathUtils.clamp(pos.z, terrainCenterZ - halfD, terrainCenterZ + halfD);
+  }
+
+  function scatterGravel(instanced, count, sizeMin, sizeMax){
+    for(let i=0;i<count;i++){
+      const pos = sampleGravelPos();
+      const sc = THREE.MathUtils.lerp(sizeMin, sizeMax, rng());
+      confineToTerrain(pos, sc * 1.35);
+      _p.copy(pos);
+      _e.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+      _q.setFromEuler(_e);
+      const scaleMin = THREE.MathUtils.lerp(0.58, 0.78, gravelRealism);
+      const scaleMax = THREE.MathUtils.lerp(1.52, 1.30, gravelRealism);
+      const scaleMinY = THREE.MathUtils.lerp(0.52, 0.72, gravelRealism);
+      const scaleMaxY = THREE.MathUtils.lerp(1.38, 1.20, gravelRealism);
+      _s.set(
+        sc * THREE.MathUtils.lerp(scaleMin, scaleMax, rng()),
+        sc * THREE.MathUtils.lerp(scaleMinY, scaleMaxY, rng()),
+        sc * THREE.MathUtils.lerp(scaleMin, scaleMax, rng())
+      );
+      _m.compose(_p, _q, _s);
+      instanced.setMatrixAt(i, _m);
+    }
+    instanced.instanceMatrix.needsUpdate = true;
+  }
+  const gravelSizeMin = Math.max(0.0001, Math.min(env.gravelSizeMin, env.gravelSizeMax));
+  const gravelSizeMax = Math.max(gravelSizeMin, Math.max(env.gravelSizeMin, env.gravelSizeMax));
+  const sizeBand = gravelSizeMax - gravelSizeMin;
+  scatterGravel(gravelLarge, env.gravelCountLarge, gravelSizeMin + sizeBand * 0.34, gravelSizeMin + sizeBand * 1.00);
+  scatterGravel(gravelMedium, env.gravelCountMedium, gravelSizeMin + sizeBand * 0.12, gravelSizeMin + sizeBand * 0.55);
+  scatterGravel(gravelSmall, env.gravelCountSmall, gravelSizeMin + sizeBand * 0.00, gravelSizeMin + sizeBand * 0.28);
+  environmentGroup.add(gravelLarge);
+  environmentGroup.add(gravelMedium);
+  environmentGroup.add(gravelSmall);
+  }
+}
+createEnvironment();
+
+/* ============================================================
+   遷移アニメーション
+   ============================================================ */
+function easeInOutCubic(t){
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+}
+
+let transitionStartTime = null; // null = 未開始
+let transitionQueued = false; // タップ多重起動ガード
+
+/* 火の粉サイズ補間用 */
+let flameSizeCurrent = CONFIG.fireStyle.sparkSize;
+let flameSizeTarget  = CONFIG.fireStyle.sparkSize;
+let particleCountCurrent = N_BASE;
+let particleCountTarget  = N_BASE;
+
+// 一時ベクトル (毎フレーム再利用)
+const _tFirePos = new THREE.Vector3();
+const _tCamPos  = new THREE.Vector3();
+const _tCamLook = new THREE.Vector3();
+
+// UI 要素
+const titleWrapEl = document.getElementById('titleWrap');
+const tapEnterEl  = document.getElementById('tapEnter');
+const bgLightEl   = document.getElementById('worldBg');
+const menuBtnEl = document.getElementById('menuBtn');
+const sideMenuEl = document.getElementById('sideMenu');
+const menuBackdropEl = document.getElementById('menuBackdrop');
+const menuRegisterBtnEl = sideMenuEl.querySelector('.menu-item.register');
+const menuRemoveBtnEl = sideMenuEl.querySelector('.menu-item.remove');
+const menuListBtnEl = sideMenuEl.querySelector('.menu-item.list');
+const friendUiLayerEl = document.getElementById('friendUiLayer');
+const friendAddPanelEl = document.getElementById('friendAddPanel');
+const friendListPanelEl = document.getElementById('friendListPanel');
+const friendRemovePanelEl = document.getElementById('friendRemovePanel');
+const friendAddBackBtnEl = document.getElementById('friendAddBackBtn');
+const friendListBackBtnEl = document.getElementById('friendListBackBtn');
+const friendRemoveBackBtnEl = document.getElementById('friendRemoveBackBtn');
+const friendIdInputEl = document.getElementById('friendIdInput');
+const friendFoundNameEl = document.getElementById('friendFoundName');
+const friendAddActionBtnEl = document.getElementById('friendAddActionBtn');
+const friendConfirmEl = document.getElementById('friendConfirm');
+const friendConfirmCardEl = friendConfirmEl.querySelector('.friend-confirm-card');
+const friendConfirmTextEl = document.getElementById('friendConfirmText');
+const friendConfirmActionsEl = friendConfirmEl.querySelector('.friend-confirm-actions');
+const friendConfirmYesBtnEl = document.getElementById('friendConfirmYesBtn');
+const friendConfirmNoBtnEl = document.getElementById('friendConfirmNoBtn');
+const friendWaitingListEl = document.getElementById('friendWaitingList');
+const friendListEmptyEl = document.getElementById('friendListEmpty');
+const friendCurrentListEl = document.getElementById('friendCurrentList');
+const friendCurrentEmptyEl = document.getElementById('friendCurrentEmpty');
+const friendRemoveListEl = document.getElementById('friendRemoveList');
+const friendRemoveEmptyEl = document.getElementById('friendRemoveEmpty');
+const friendKnownMap = { '000000': 'Aki' };
+const waitingFriends = ['Aki']; // 友達リスト先頭に表示
+const removableFriends = [
+  {name:'Yoshi', id:'481730'},
+  {name:'Hinata', id:'290645'},
+  {name:'Takayuki', id:'763918'},
+];
+let currentFriendCandidate = '';
+let currentFriendPanel = 'none';
+let friendConfirmYesAction = null;
+let friendConfirmMsgTimer = null;
+let friendConfirmSwapTimer = null;
+let friendConfirmFadeOutTimer = null;
+let friendConfirmResetTimer = null;
+
+function refreshMenuBackdrop(){
+  const menuOpen = sideMenuEl.classList.contains('open');
+  const friendOpen = friendUiLayerEl.classList.contains('open');
+  menuBackdropEl.classList.toggle('open', menuOpen || friendOpen);
+}
+
+function renderWaitingFriendList(){
+  friendWaitingListEl.innerHTML = '';
+  waitingFriends.forEach(name => {
+    const li = document.createElement('li');
+    li.className = 'friend-wait-item';
+    li.textContent = `${name}の承認まち`;
+    friendWaitingListEl.appendChild(li);
+  });
+  friendListEmptyEl.style.display = waitingFriends.length > 0 ? 'none' : 'block';
+}
+
+function renderCurrentFriendList(){
+  friendCurrentListEl.innerHTML = '';
+  removableFriends.forEach(friend => {
+    const li = document.createElement('li');
+    li.className = 'friend-wait-item';
+    li.textContent = `${friend.name} ${friend.id}`;
+    friendCurrentListEl.appendChild(li);
+  });
+  friendCurrentEmptyEl.style.display = removableFriends.length > 0 ? 'none' : 'block';
+}
+
+function renderRemoveFriendList(){
+  friendRemoveListEl.innerHTML = '';
+  removableFriends.forEach(friend => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'friend-remove-item';
+    btn.textContent = `${friend.name} ${friend.id}`;
+    btn.addEventListener('click', () => {
+      openFriendConfirm(
+        `${friend.name}を解除しますか？`,
+        () => {
+          const idx = removableFriends.findIndex(f => f.name === friend.name && f.id === friend.id);
+          if(idx >= 0) removableFriends.splice(idx, 1);
+          renderRemoveFriendList();
+          renderCurrentFriendList();
+          showFriendConfirmMessage(`${friend.name}を解除しました`);
+        }
+      );
+    });
+    friendRemoveListEl.appendChild(btn);
+  });
+  friendRemoveEmptyEl.style.display = removableFriends.length > 0 ? 'none' : 'block';
+}
+
+function setFriendConfirmOpen(open){
+  friendConfirmEl.classList.toggle('open', open);
+  friendConfirmEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if(!open){
+    if(friendConfirmMsgTimer !== null){
+      clearTimeout(friendConfirmMsgTimer);
+      friendConfirmMsgTimer = null;
+    }
+    if(friendConfirmSwapTimer !== null){
+      clearTimeout(friendConfirmSwapTimer);
+      friendConfirmSwapTimer = null;
+    }
+    if(friendConfirmFadeOutTimer !== null){
+      clearTimeout(friendConfirmFadeOutTimer);
+      friendConfirmFadeOutTimer = null;
+    }
+    if(friendConfirmResetTimer !== null){
+      clearTimeout(friendConfirmResetTimer);
+      friendConfirmResetTimer = null;
+    }
+    // 先に中身を戻すと、フェードアウト中に「〜しますか？」が再表示されるため遅延リセットする
+    friendConfirmResetTimer = setTimeout(() => {
+      if(friendConfirmEl.classList.contains('open')) return;
+      friendConfirmYesAction = null;
+      friendConfirmActionsEl.style.display = 'flex';
+      friendConfirmCardEl.classList.remove('message-mode');
+      friendConfirmTextEl.classList.remove('is-fading-out', 'is-fading-in');
+      friendConfirmResetTimer = null;
+    }, 360);
+  }
+}
+
+function setFriendPanel(panelName){
+  currentFriendPanel = panelName;
+  const addOpen = panelName === 'add';
+  const listOpen = panelName === 'list';
+  const removeOpen = panelName === 'remove';
+  const anyOpen = addOpen || listOpen || removeOpen;
+  friendAddPanelEl.classList.toggle('open', addOpen);
+  friendListPanelEl.classList.toggle('open', listOpen);
+  friendRemovePanelEl.classList.toggle('open', removeOpen);
+  friendAddPanelEl.setAttribute('aria-hidden', addOpen ? 'false' : 'true');
+  friendListPanelEl.setAttribute('aria-hidden', listOpen ? 'false' : 'true');
+  friendRemovePanelEl.setAttribute('aria-hidden', removeOpen ? 'false' : 'true');
+  friendUiLayerEl.classList.toggle('open', anyOpen);
+  friendUiLayerEl.setAttribute('aria-hidden', anyOpen ? 'false' : 'true');
+  if(!anyOpen) setFriendConfirmOpen(false);
+  refreshMenuBackdrop();
+}
+
+function openFriendPanel(panelName){
+  setSideMenuOpen(false);
+  setTimeout(() => {
+    if(transitionStartTime === null) return;
+    setFriendPanel(panelName);
+  }, 120);
+}
+
+function setSideMenuOpen(open){
+  menuBtnEl.classList.toggle('open', open);
+  sideMenuEl.classList.toggle('open', open);
+  sideMenuEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+  refreshMenuBackdrop();
+}
+
+function openFriendConfirm(questionText, onYes){
+  friendConfirmTextEl.textContent = questionText;
+  friendConfirmActionsEl.style.display = 'flex';
+  friendConfirmCardEl.classList.remove('message-mode');
+  friendConfirmYesAction = onYes;
+  setFriendConfirmOpen(true);
+}
+
+function showFriendConfirmMessage(messageText){
+  const fadeMs = 600;
+  const messageHoldMs = 1600;
+  friendConfirmActionsEl.style.display = 'none';
+  friendConfirmCardEl.classList.add('message-mode');
+  friendConfirmTextEl.classList.remove('is-fading-in');
+  friendConfirmTextEl.classList.add('is-fading-out');
+
+  if(friendConfirmSwapTimer !== null) clearTimeout(friendConfirmSwapTimer);
+  if(friendConfirmFadeOutTimer !== null) clearTimeout(friendConfirmFadeOutTimer);
+  if(friendConfirmMsgTimer !== null) clearTimeout(friendConfirmMsgTimer);
+
+  friendConfirmSwapTimer = setTimeout(() => {
+    friendConfirmTextEl.textContent = messageText;
+    friendConfirmTextEl.classList.remove('is-fading-out');
+    void friendConfirmTextEl.offsetWidth;
+    friendConfirmTextEl.classList.add('is-fading-in');
+
+    friendConfirmFadeOutTimer = setTimeout(() => {
+      friendConfirmTextEl.classList.remove('is-fading-in');
+      friendConfirmTextEl.classList.add('is-fading-out');
+    }, messageHoldMs);
+
+    friendConfirmMsgTimer = setTimeout(() => {
+      setFriendConfirmOpen(false);
+    }, messageHoldMs + fadeMs);
+  }, fadeMs);
+}
+
+function updateFriendLookupState(){
+  const digits = friendIdInputEl.value.replace(/\D/g, '').slice(0, 6);
+  if(friendIdInputEl.value !== digits) friendIdInputEl.value = digits;
+  friendIdInputEl.placeholder = digits.length > 0 ? '------' : '友達のIDを入力する';
+  const candidateName = friendKnownMap[digits] ?? '';
+  currentFriendCandidate = candidateName;
+  if(candidateName){
+    friendFoundNameEl.textContent = candidateName;
+    friendFoundNameEl.classList.add('show');
+    friendAddActionBtnEl.disabled = false;
+  }else{
+    friendFoundNameEl.classList.remove('show');
+    friendAddActionBtnEl.disabled = true;
+  }
+}
+
+renderWaitingFriendList();
+renderCurrentFriendList();
+renderRemoveFriendList();
+updateFriendLookupState();
+
+menuBtnEl.addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  if(transitionStartTime === null) return;
+  if(currentFriendPanel !== 'none'){
+    setFriendPanel('none');
+    setSideMenuOpen(true);
+    return;
+  }
+  setSideMenuOpen(!sideMenuEl.classList.contains('open'));
+});
+menuBackdropEl.addEventListener('click', () => {
+  setFriendConfirmOpen(false);
+  setFriendPanel('none');
+  setSideMenuOpen(false);
+});
+menuRegisterBtnEl?.addEventListener('click', () => openFriendPanel('add'));
+menuRemoveBtnEl?.addEventListener('click', () => openFriendPanel('remove'));
+menuListBtnEl?.addEventListener('click', () => openFriendPanel('list'));
+friendAddBackBtnEl?.addEventListener('click', () => {
+  setFriendPanel('none');
+  setSideMenuOpen(true);
+});
+friendListBackBtnEl?.addEventListener('click', () => {
+  setFriendPanel('none');
+  setSideMenuOpen(true);
+});
+friendRemoveBackBtnEl?.addEventListener('click', () => {
+  setFriendPanel('none');
+  setSideMenuOpen(true);
+});
+friendIdInputEl?.addEventListener('input', updateFriendLookupState);
+friendAddActionBtnEl?.addEventListener('click', () => {
+  if(!currentFriendCandidate) return;
+  openFriendConfirm(
+    `${currentFriendCandidate}を追加しますか？`,
+    () => {
+      if(currentFriendCandidate && !waitingFriends.includes(currentFriendCandidate)){
+        waitingFriends.unshift(currentFriendCandidate);
+        renderWaitingFriendList();
+      }
+      showFriendConfirmMessage('追加申請を出しました');
+    }
+  );
+});
+friendConfirmNoBtnEl?.addEventListener('click', () => {
+  setFriendConfirmOpen(false);
+});
+friendConfirmYesBtnEl?.addEventListener('click', () => {
+  if(typeof friendConfirmYesAction === 'function'){
+    friendConfirmYesAction();
+  }else{
+    setFriendConfirmOpen(false);
+  }
+});
+
+/* ---------- レンダーループ ---------- */
+const _t0 = performance.now();
+
+function tick(){
+  const now = (performance.now() - _t0) / 1000; // シェーダー用経過秒
+  let labelFade = 0.0;
+  let figureFade = 0.0;
+
+  /* シェーダー時刻 */
+  glowMat.uniforms.uTime.value  = now;
+  flameMat.uniforms.uTime.value = now;
+  emberBedMat.uniforms.uTime.value = now;
+
+  /* 焚き火ライトのちらつき */
+  fireLight.intensity =
+    CONFIG.fireStyle.fireLightBase +
+    Math.sin(now * 5.8) * CONFIG.fireStyle.fireLightFlickerA +
+    Math.sin(now * 11.9) * CONFIG.fireStyle.fireLightFlickerB;
+  const fireLevel = THREE.MathUtils.clamp(
+    fireLight.intensity / Math.max(0.001, CONFIG.fireStyle.fireLightBase + CONFIG.fireStyle.fireLightFlickerA + CONFIG.fireStyle.fireLightFlickerB),
+    0.55,
+    1.25
+  );
+  const logWarmStrength = THREE.MathUtils.clamp(CONFIG.logEdgeGlow + CONFIG.fireStyle.logWarmRimIntensity * 0.8, 0.0, 1.0);
+  const warmTint = new THREE.Color(1.0, 0.46, 0.12);
+  for(let i=0;i<logMats.length;i++){
+    const t = THREE.MathUtils.clamp((fireLevel - 0.55) / 0.70, 0, 1) * logWarmStrength;
+    logMats[i].color.copy(logBaseColors[i]).lerp(warmTint, t * 0.28);
+  }
+
+  /* 薪の微細な揺れ */
+  logsGroup.position.y = Math.sin(now*0.6) * 0.005;
+
+  /* 雲の緩やかなドリフト */
+  cloudDriftEntries.forEach(c => {
+    c.group.position.x = c.baseX + Math.sin(now * c.speed + c.phase) * c.amp;
+    c.group.position.z = c.baseZ + Math.cos(now * c.speed * 0.72 + c.phase) * c.amp * 0.45;
+  });
+
+  /* 炎パーティクルサイズ補間 (クリック後 1.5倍へ) */
+  if(Math.abs(flameSizeCurrent - flameSizeTarget) > 0.05){
+    flameSizeCurrent += (flameSizeTarget - flameSizeCurrent) * 0.01;
+    flameMat.uniforms.uBaseSize.value = flameSizeCurrent;
+  }
+  if(Math.abs(particleCountCurrent - particleCountTarget) > 0.5){
+    particleCountCurrent += (particleCountTarget - particleCountCurrent) * 0.14;
+    flameMat.uniforms.uActiveCount.value = particleCountCurrent;
+  }
+
+  /* ── 遷移アニメーション ── */
+  if(transitionStartTime !== null){
+    const elapsed = (performance.now() - _t0)/1000 - transitionStartTime;
+    const raw = Math.min(1.0, elapsed / CONFIG.transition.duration);
+    const e   = easeInOutCubic(raw);
+
+    /* 焚き火グループ: 位置 & スケール */
+    _tFirePos.lerpVectors(FIRE_POS_INIT, FIRE_POS_FINAL, e);
+    fireGroup.position.copy(_tFirePos);
+    const scaleAccel = Math.max(0.01, CONFIG.transition.fireScaleAccel);
+    const scaleT = Math.pow(raw, scaleAccel);
+    const fireScaleNow = THREE.MathUtils.lerp(FIRE_SCALE_INIT, FIRE_SCALE_FINAL, scaleT);
+    fireGroup.scale.setScalar(fireScaleNow);
+
+    /* カメラ: 位置 & 注視点 */
+    _tCamPos .lerpVectors(CAM_POS_INIT,  CAM_POS_FINAL,  e);
+    _tCamLook.lerpVectors(CAM_LOOK_INIT, CAM_LOOK_FINAL, e);
+    camera.position.copy(_tCamPos);
+    camera.lookAt(_tCamLook);
+
+    /* 人型オブジェクト: フェードイン (ベース + ハロー別々に opacity 制御) */
+    figBaseMats.forEach(m => { m.opacity = e; });
+    figHaloMats.forEach(m => { m.opacity = 0.0; }); // 発光ループ側で個別制御
+    labelFade = e;
+    figureFade = e;
+    menuBtnEl.style.opacity = `${e}`;
+    menuBtnEl.classList.toggle('menu-ready', e > 0.02);
+
+    /* 背景環境: タップ後に遅れてフェードイン */
+    const envStart = CONFIG.environment.fadeStart;
+    const envDur   = Math.max(0.001, CONFIG.environment.fadeDuration);
+    const envE = THREE.MathUtils.clamp((raw - envStart) / envDur, 0, 1);
+    envFadeEntries.forEach(({mat, targetOpacity}) => {
+      mat.opacity = targetOpacity * envE;
+    });
+
+  }
+  if(CONFIG.transition.fireGroundedToTerrain){
+    const fireScaleNow = fireGroup.scale.y;
+    if(transitionStartTime === null){
+      fireGroup.position.x = FIRE_POS_INIT.x;
+      fireGroup.position.z = FIRE_POS_INIT.z;
+      fireGroup.position.y =
+        getGroundYBase() +
+        (CONFIG.transition.fireInitialGroundOffsetY ?? 0) -
+        (LOGS_MIN_Y * fireScaleNow);
+    }else{
+      fireGroup.position.y = getGroundYBase() + getFireGroundOffsetEffective() - (LOGS_MIN_Y * fireScaleNow);
+    }
+  }
+  for(const fig of figures){
+    fig.lookAt(
+      fireGroup.position.x,
+      fig.position.y + FIGURE_LOOK_Y_OFFSET,
+      fireGroup.position.z
+    );
+  }
+  const idleEnabled = !!CONFIG.figures.headIdleMotionEnabled;
+  const idleSpeed = Math.max(0.01, CONFIG.figures.headIdleSpeed ?? 0.72);
+  const idleYawAmp = THREE.MathUtils.degToRad(CONFIG.figures.headIdleAmpYawDeg ?? 2.4);
+  const idlePitchAmp = THREE.MathUtils.degToRad(CONFIG.figures.headIdleAmpPitchDeg ?? 1.6);
+  const idlePhaseSpread = CONFIG.figures.headIdlePhaseSpread ?? 1.4;
+  for(let i=0;i<figures.length;i++){
+    const headRig = figures[i].userData.headRig;
+    if(!headRig) continue;
+    if(!idleEnabled){
+      headRig.rotation.set(0, 0, 0);
+      continue;
+    }
+    const p = i * idlePhaseSpread;
+    headRig.rotation.z = Math.sin(now * idleSpeed + p) * idleYawAmp;
+    headRig.rotation.x = Math.sin(now * idleSpeed * 0.83 + p * 1.37) * idlePitchAmp;
+  }
+
+  const pulseDuration = Math.max(0.05, CONFIG.figures.pulseDurationSec ?? 1.0);
+  const pulsePeakIntensity = Math.max(0.0, CONFIG.figures.pulsePeakIntensity ?? 1.4);
+  for(let i=0;i<figures.length;i++){
+    const fig = figures[i];
+    const pulseMat = fig.userData.pulseBaseMat;
+    if(!pulseMat) continue;
+    const pulseColor = fig.userData.pulseColor instanceof THREE.Color
+      ? fig.userData.pulseColor
+      : new THREE.Color(1, 1, 1);
+    let pulse = 0.0;
+    const pulseStart = fig.userData.pulseStartTime;
+    if(typeof pulseStart === 'number' && pulseStart >= 0){
+      const tn = (now - pulseStart) / pulseDuration;
+      if(tn >= 0.0 && tn <= 1.0){
+        pulse = 1.0 - Math.abs(tn * 2.0 - 1.0); // 0s:0 -> 0.5s:1 -> 1s:0
+      }else if(tn > 1.0){
+        fig.userData.pulseStartTime = -1;
+      }
+    }
+    pulseMat.emissive.copy(pulseColor);
+    pulseMat.emissiveIntensity = pulsePeakIntensity * pulse * figureFade;
+
+    const pulseHaloMat = fig.userData.pulseHaloMat;
+    if(pulseHaloMat){
+      const haloBase = THREE.MathUtils.clamp(CONFIG.figures.haloOpacity ?? 0.0, 0.0, 2.0);
+      const haloBoost = pulsePeakIntensity * 0.33 * pulse;
+      pulseHaloMat.color.copy(pulseColor);
+      pulseHaloMat.opacity = figureFade * (haloBase + haloBoost);
+    }
+  }
+  fireGroup.updateMatrixWorld(true);
+  camera.updateMatrixWorld();
+  camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  volumeFire.update(now);
+
+  const nameLift = CONFIG.figures.bodyHeight * 0.68 + CONFIG.figures.headRadius + (CONFIG.figures.nameYOffset ?? 0.52);
+  const fw = frame.clientWidth;
+  const fh = frame.clientHeight;
+  const nameOpacity = THREE.MathUtils.clamp(labelFade, 0, 1);
+  for(let i=0;i<figures.length;i++){
+    const fig = figures[i];
+    const tag = nameTags[i];
+    if(!fig.visible){
+      tag.style.opacity = '0';
+      continue;
+    }
+    _nameWorld.set(fig.position.x, fig.position.y + nameLift, fig.position.z);
+    _nameWorld.project(camera);
+    const onScreen = _nameWorld.z >= -1.0 && _nameWorld.z <= 1.0;
+    if(!onScreen){
+      tag.style.opacity = '0';
+      continue;
+    }
+    const sx = (_nameWorld.x * 0.5 + 0.5) * fw;
+    const sy = (-_nameWorld.y * 0.5 + 0.5) * fh;
+    tag.style.left = `${sx}px`;
+    tag.style.top = `${sy}px`;
+    tag.style.opacity = `${nameOpacity}`;
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+
+/* ---------- タップで遷移開始 ---------- */
+window.addEventListener('pointerdown', () => {
+  if(transitionStartTime !== null || transitionQueued) return; // 遷移済み/予約済み
+  transitionQueued = true;
+
+  /* ① テキスト完全消去
+     CSS animation (slowPulse 等) を止めてから opacity:0 にしないと
+     アニメーションが style.opacity を上書きし続けてしまう */
+  titleWrapEl.style.animation = 'none';
+  tapEnterEl.style.animation = 'none';
+  titleWrapEl.classList.add('hide');
+  tapEnterEl.classList.add('hide');
+
+
+
+  /* ③ 背景を明るく (CSS transition で焚き火色オーバーレイをフェードイン) */
+  bgLightEl.style.opacity = '1';
+
+  assignPulseColorsToFigures();
+  primePulseAudio();
+  startFigurePulseLoop();
+  startTakibiLoopAudio();
+
+  /* デザインルール: 0.25sec のもったり遅延後に画面遷移開始 */
+  setTimeout(() => {
+    figures.forEach(fig => { fig.visible = true; });
+    environmentGroup.visible = true;
+    transitionStartTime = (performance.now() - _t0) / 1000;
+  }, 250);
+
+  /* 炎サイズはタップ後0.3secで設定倍率へ補間開始 */
+  setTimeout(() => {
+    flameSizeTarget = CONFIG.fireStyle.sparkSize * CONFIG.particleTapScaleMultiplier;
+    particleCountTarget = N_BASE * 2.0;
+  }, 300);
+});
+</script>
+</body>
+</html>
