@@ -1826,14 +1826,33 @@ function shuffleArrayInPlace(arr){
 }
 
 function assignPulseColorsToFigures(){
-  const palette = (CONFIG.figures.pulseColorPalette ?? []).map(configColorToThree);
-  if(palette.length === 0){
-    figures.forEach(fig => { fig.userData.pulseColor = new THREE.Color(1, 1, 1); });
+  const basePalette = (CONFIG.figures.pulseColorPalette ?? []).map(configColorToThree);
+  if(basePalette.length === 0){
+    figures.forEach((fig, i) => {
+      const c = new THREE.Color().setHSL((i / Math.max(1, figures.length)) % 1.0, 0.62, 0.62);
+      fig.userData.pulseColor = c;
+    });
     return;
   }
-  shuffleArrayInPlace(palette);
+
+  // 重複色を除去したうえで、人数分のユニーク色を準備する
+  const uniquePalette = [];
+  const seen = new Set();
+  for(const c of basePalette){
+    const key = c.getHexString();
+    if(seen.has(key)) continue;
+    seen.add(key);
+    uniquePalette.push(c.clone());
+  }
+  while(uniquePalette.length < figures.length){
+    const i = uniquePalette.length;
+    const c = new THREE.Color().setHSL((i / Math.max(1, figures.length)) % 1.0, 0.60, 0.60);
+    uniquePalette.push(c);
+  }
+
+  shuffleArrayInPlace(uniquePalette);
   figures.forEach((fig, i) => {
-    fig.userData.pulseColor = palette[i % palette.length].clone();
+    fig.userData.pulseColor = uniquePalette[i].clone();
   });
 }
 
